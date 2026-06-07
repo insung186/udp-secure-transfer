@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -22,6 +23,10 @@
 #define HTTP_BUF 32768
 #define JSON_BUF 262144
 #define SMALL_BUF 512
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 typedef struct {
     pid_t pid;
@@ -411,6 +416,141 @@ static int json_get_int(const char *body, const char *key, int fallback) {
     return atoi(value);
 }
 
+static int is_windows_drive_path(const char *path) {
+    if (!path || !path[0] || path[1] != ':') {
+        return 0;
+    }
+    return ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) &&
+           (path[2] == '/' || path[2] == '\\');
+}
+
+static int is_abs_path(const char *path) {
+    return path && (path[0] == '/' || path[0] == '\\' || is_windows_drive_path(path));
+}
+
+static int path_is_blank(const char *path) {
+    const char *p = path;
+    if (!p) {
+        return 1;
+    }
+    while (*p) {
+        if (*p != ' ' && *p != '\t' && *p != '\r' && *p != '\n') {
+            return 0;
+        }
+        p++;
+    }
+    return 1;
+}
+
+static int validate_relative_path(const char *path, const char *kind, char *error, size_t error_size) {
+    if (path_is_blank(path)) {
+        snprintf(error, error_size, "%s path is empty", kind);
+        return -1;
+    }
+    if (is_abs_path(path)) {
+        snprintf(error, error_size, "%s path must be relative: %.420s", kind, path);
+        return -1;
+    }
+    if (strlen(path) >= PATH_MAX) {
+        snprintf(error, error_size, "%s path is too long", kind);
+        return -1;
+    }
+    return 0;
+}
+
+static void path_error(char *error, size_t error_size, const char *prefix, const char *path) {
+    snprintf(error, error_size, "%s%.420s", prefix, path ? path : "");
+}
+
+static int parent_dir(const char *path, char *out, size_t out_size) {
+    const char *slash = strrchr(path, '/');
+    if (!slash) {
+        snprintf(out, out_size, ".");
+        return 0;
+    }
+    if (slash == path) {
+        snprintf(out, out_size, "/");
+        return 0;
+    }
+    if ((size_t)(slash - path) >= out_size) {
+        return -1;
+    }
+    memcpy(out, path, (size_t)(slash - path));
+    out[slash - path] = '\0';
+    return 0;
+}
+
+static int resolve_input_path(const char *path, char *out, size_t out_size, char *error, size_t error_size) {
+    struct stat st;
+    if (validate_relative_path(path, "input", error, error_size) != 0) {
+        return -1;
+    }
+    if (snprintf(out, out_size, "%s", path) >= (int)out_size) {
+        snprintf(error, error_size, "input path is too long");
+        return -1;
+    }
+    if (stat(out, &st) != 0) {
+        path_error(error, error_size, "input file not found: ", out);
+        return -1;
+    }
+    if (!S_ISREG(st.st_mode)) {
+        path_error(error, error_size, "input path is not a regular file: ", out);
+        return -1;
+    }
+    if (access(out, R_OK) != 0) {
+        path_error(error, error_size, "input file is not readable: ", out);
+        return -1;
+    }
+    return 0;
+}
+
+static int resolve_output_path(const char *path, char *out, size_t out_size, char *error, size_t error_size) {
+    struct stat st;
+    char dir[PATH_MAX];
+    if (validate_relative_path(path, "output", error, error_size) != 0) {
+        return -1;
+    }
+    if (snprintf(out, out_size, "%s", path) >= (int)out_size) {
+        snprintf(error, error_size, "output path is too long");
+        return -1;
+    }
+    if (stat(out, &st) == 0) {
+        if (S_ISDIR(st.st_mode)) {
+            path_error(error, error_size, "output path is a directory: ", out);
+            return -1;
+        }
+        if (access(out, W_OK) != 0) {
+            path_error(error, error_size, "output file is not writable: ", out);
+            return -1;
+        }
+    }
+    if (parent_dir(out, dir, sizeof(dir)) != 0) {
+        snprintf(error, error_size, "output path is too long");
+        return -1;
+    }
+    if (stat(dir, &st) != 0) {
+        path_error(error, error_size, "output directory not found: ", dir);
+        return -1;
+    }
+    if (!S_ISDIR(st.st_mode)) {
+        path_error(error, error_size, "output parent is not a directory: ", dir);
+        return -1;
+    }
+    if (access(dir, W_OK) != 0) {
+        path_error(error, error_size, "output directory is not writable: ", dir);
+        return -1;
+    }
+    return 0;
+}
+
+static void send_error_json(int fd, const char *status, const char *error) {
+    char escaped[SMALL_BUF * 2];
+    char json[SMALL_BUF * 2 + 64];
+    json_escape_to(escaped, sizeof(escaped), error);
+    snprintf(json, sizeof(json), "{\"ok\":false,\"error\":%s}", escaped);
+    send_http(fd, status, "application/json; charset=utf-8", json);
+}
+
 static void append_log_array(char *json, size_t cap, const char *key, const char *path) {
     FILE *fp = fopen(path, "r");
     char line[8192];
@@ -482,13 +622,18 @@ static void truncate_logs(void) {
 }
 
 static void api_server_start(int fd, const char *body) {
-    static char port[32], password[256], input[512];
-    char *args[] = {"./server", port, password, input, NULL};
+    static char port[32], password[256], input[PATH_MAX], checked_input[PATH_MAX];
+    char error[SMALL_BUF];
+    char *args[] = {"./server", port, password, checked_input, NULL};
     int port_num = json_get_int(body, "port", 9000);
     snprintf(port, sizeof(port), "%d", port_num);
     if (json_get_string(body, "password", password, sizeof(password), "secret") != 0 ||
         json_get_string(body, "inputFile", input, sizeof(input), "test/input.txt") != 0) {
         send_http(fd, "400 Bad Request", "application/json", "{\"ok\":false,\"error\":\"invalid body\"}");
+        return;
+    }
+    if (resolve_input_path(input, checked_input, sizeof(checked_input), error, sizeof(error)) != 0) {
+        send_error_json(fd, "400 Bad Request", error);
         return;
     }
     if (start_child(&state.server, args, 0) != 0) {
@@ -499,9 +644,10 @@ static void api_server_start(int fd, const char *body) {
 }
 
 static void api_client_start(int fd, const char *body) {
-    static char host[256], port[32], out[512], pwd1[256], pwd2[256], pwd3[256], mode[32];
-    char *args_compat[] = {"./client", host, port, pwd1, pwd2, pwd3, out, NULL};
-    char *args_interactive[] = {"./client", host, port, out, NULL};
+    static char host[256], port[32], out[PATH_MAX], checked_out[PATH_MAX], pwd1[256], pwd2[256], pwd3[256], mode[32];
+    char error[SMALL_BUF];
+    char *args_compat[] = {"./client", host, port, pwd1, pwd2, pwd3, checked_out, NULL};
+    char *args_interactive[] = {"./client", host, port, checked_out, NULL};
     int port_num = json_get_int(body, "port", 9000);
     snprintf(port, sizeof(port), "%d", port_num);
     json_get_string(body, "host", host, sizeof(host), "127.0.0.1");
@@ -510,6 +656,10 @@ static void api_client_start(int fd, const char *body) {
     json_get_string(body, "pwd1", pwd1, sizeof(pwd1), "");
     json_get_string(body, "pwd2", pwd2, sizeof(pwd2), "");
     json_get_string(body, "pwd3", pwd3, sizeof(pwd3), "");
+    if (resolve_output_path(out, checked_out, sizeof(checked_out), error, sizeof(error)) != 0) {
+        send_error_json(fd, "400 Bad Request", error);
+        return;
+    }
     if (strcmp(mode, "interactive") == 0) {
         if (start_child(&state.client, args_interactive, 1) != 0) {
             send_http(fd, "409 Conflict", "application/json", "{\"ok\":false,\"error\":\"client already running or failed\"}");

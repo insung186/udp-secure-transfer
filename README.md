@@ -122,10 +122,10 @@ http://127.0.0.1:8080/
 ./control_server 18080
 ```
 
-控制台包含五个 Tab：
+控制台采用左侧可折叠控制边栏 + 右侧多 Tab 展示区：
 
+- 左侧边栏: server/client 配置、启动/停止、重置、兼容三密码、交互式密码输入
 - Dashboard: 总览状态、协议阶段、传输摘要、SHA1 摘要、最近日志
-- Config: server/client 配置、启动/停止、兼容三密码、交互式密码输入
 - Protocol: 协议时序图、包列表、Packet Inspector
 - Transfer: 传输进度、分片矩阵、吞吐率、SHA1 校验
 - Logs & Test: 实时日志、过滤搜索、异常模拟、测试结果
@@ -236,8 +236,8 @@ logs/control.jsonl
 - 本地 C 控制后端 `control_server`。
 - HTTP 接口启动/停止 server/client、发送交互式密码、读取日志、运行测试。
 - WebSocket 推送日志和状态。
-- Web 多 Tab 控制台。
-- Dashboard、Config、Protocol、Transfer、Logs & Test 五个页面。
+- Web 控制台左侧可折叠控制边栏 + 多 Tab 展示区。
+- Dashboard、Protocol、Transfer、Logs & Test 四个展示页面，配置与控制集中在左侧边栏。
 - Packet Inspector 显示包字段和十六进制预览。
 - 分片矩阵、传输进度、吞吐率和 SHA1 校验展示。
 - JSON Lines 结构化日志。

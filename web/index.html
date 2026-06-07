@@ -3,108 +3,249 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Secure UDP Transfer Lab</title>
+    <title>UDP 安全传输实验台</title>
     <link rel="stylesheet" href="/css/style.css">
   </head>
   <body>
-    <div class="app-shell">
-      <header class="topbar">
-        <div>
-          <p class="caption">Secure UDP Transfer Lab</p>
-          <h1>最小安全通信协议控制台</h1>
+    <div class="app-shell" id="app-shell">
+      <aside class="control-sidebar" id="control-sidebar" aria-label="实验控制边栏">
+        <div class="sidebar-head">
+          <button class="rail-button" id="sidebar-toggle" type="button" aria-expanded="true" title="收起控制边栏" aria-label="收起控制边栏">
+            <span class="shape-icon icon-menu" aria-hidden="true"></span>
+          </button>
+          <div class="sidebar-title">
+            <p class="caption" data-i18n="appName">UDP 安全传输实验台</p>
+            <h1 data-i18n="console">控制台</h1>
+          </div>
         </div>
-        <div class="status-strip" aria-live="polite">
-          <span class="status-pill" id="server-pill">Server: Stopped</span>
-          <span class="status-pill" id="client-pill">Client: Stopped</span>
-          <span class="status-pill" id="phase-pill">Phase: INIT</span>
-          <span class="status-pill result" id="result-pill">Result: Pending</span>
+
+        <div class="sidebar-rail" aria-label="收起状态控制">
+          <span class="rail-status" id="rail-server-status" title="服务端状态">
+            <span class="rail-dot" id="server-dot" aria-hidden="true"></span>
+            <span>S</span>
+          </span>
+          <span class="rail-status" id="rail-client-status" title="客户端状态">
+            <span class="rail-dot" id="client-dot" aria-hidden="true"></span>
+            <span>C</span>
+          </span>
+          <button class="rail-button" id="rail-start-server-btn" type="button" title="启动服务端" aria-label="启动服务端">
+            <span class="shape-icon icon-play" aria-hidden="true"></span>
+          </button>
+          <button class="rail-button" id="rail-start-client-btn" type="button" title="启动客户端" aria-label="启动客户端">
+            <span class="shape-icon icon-play offset" aria-hidden="true"></span>
+          </button>
+          <button class="rail-button" id="rail-reset-btn" type="button" title="重置实验" aria-label="重置实验">
+            <span class="shape-icon icon-reset" aria-hidden="true"></span>
+          </button>
         </div>
-        <button class="icon-button" id="reset-btn" type="button" title="重置实验">Reset</button>
-      </header>
 
-      <nav class="tabs" aria-label="Console tabs">
-        <button class="tab is-active" data-tab="dashboard" type="button">Dashboard</button>
-        <button class="tab" data-tab="config" type="button">Config</button>
-        <button class="tab" data-tab="protocol" type="button">Protocol</button>
-        <button class="tab" data-tab="transfer" type="button">Transfer</button>
-        <button class="tab" data-tab="logs" type="button">Logs &amp; Test</button>
-      </nav>
+        <div class="sidebar-content">
+          <section class="control-section state-panel" id="config-state"></section>
 
-      <main>
+          <form class="control-section sidebar-form" id="server-form">
+            <div class="panel-head">
+              <h2 data-i18n="server">服务端</h2>
+              <span class="hint command-hint">./server &lt;port&gt; &lt;password&gt; &lt;inputfile&gt;</span>
+            </div>
+            <label><span class="label-text" data-i18n="listenPort">监听端口</span><input name="port" inputmode="numeric" value="9000"></label>
+            <label><span class="label-text" data-i18n="authPassword">认证密码</span>
+              <span class="password-field">
+                <input name="password" type="password" value="secret">
+                <button class="password-toggle" type="button" aria-label="显示密码" title="显示密码">
+                  <span class="shape-icon icon-eye" aria-hidden="true"></span>
+                </button>
+              </span>
+            </label>
+            <label><span class="label-text" data-i18n="inputFilePath">输入文件路径</span>
+              <span class="path-field">
+                <input id="server-input-path" name="inputFile" value="test/input.txt" placeholder="test/input.txt">
+              </span>
+            </label>
+            <div class="button-row">
+              <button class="primary-button" type="submit">
+                <span class="shape-icon icon-play" aria-hidden="true"></span>
+                <span data-i18n="startServer">启动服务端</span>
+              </button>
+              <button class="danger-button" id="stop-server-btn" type="button">
+                <span class="shape-icon icon-stop" aria-hidden="true"></span>
+                <span data-i18n="stopServer">停止服务端</span>
+              </button>
+            </div>
+          </form>
+
+          <form class="control-section sidebar-form" id="client-form">
+            <div class="panel-head">
+              <h2 data-i18n="client">客户端</h2>
+              <span class="hint" data-i18n="passwordModeHint">兼容三密码或交互式输入</span>
+            </div>
+            <label><span class="label-text" data-i18n="serverHost">服务端地址</span><input name="host" value="127.0.0.1"></label>
+            <label><span class="label-text" data-i18n="serverPort">服务端端口</span><input name="port" inputmode="numeric" value="9000"></label>
+            <label><span class="label-text" data-i18n="outputFilePath">输出文件路径</span>
+              <span class="path-field">
+                <input id="client-output-path" name="outputFile" value="output/web-output.bin" placeholder="output/web-output.bin">
+              </span>
+            </label>
+            <fieldset class="segmented" aria-label="Password mode">
+              <label><input type="radio" name="mode" value="compat" checked><span data-i18n="compatPasswords">兼容三密码</span></label>
+              <label><input type="radio" name="mode" value="interactive"><span data-i18n="interactivePassword">交互式密码</span></label>
+            </fieldset>
+            <div class="password-mode-panel compat-passwords" id="compat-passwords">
+              <label><span class="label-text" data-i18n="clientPwd1">客户端密码 1</span>
+                <span class="password-field">
+                  <input name="pwd1" type="password" value="wrong">
+                  <button class="password-toggle" type="button" aria-label="显示密码" title="显示密码">
+                    <span class="shape-icon icon-eye" aria-hidden="true"></span>
+                  </button>
+                </span>
+              </label>
+              <label><span class="label-text" data-i18n="clientPwd2">客户端密码 2</span>
+                <span class="password-field">
+                  <input name="pwd2" type="password" value="secret">
+                  <button class="password-toggle" type="button" aria-label="显示密码" title="显示密码">
+                    <span class="shape-icon icon-eye" aria-hidden="true"></span>
+                  </button>
+                </span>
+              </label>
+              <label><span class="label-text" data-i18n="clientPwd3">客户端密码 3</span>
+                <span class="password-field">
+                  <input name="pwd3" type="password" value="secret">
+                  <button class="password-toggle" type="button" aria-label="显示密码" title="显示密码">
+                    <span class="shape-icon icon-eye" aria-hidden="true"></span>
+                  </button>
+                </span>
+              </label>
+            </div>
+            <div class="password-mode-panel interactive-passwords is-hidden" id="interactive-password-panel">
+              <div class="attempt-status" id="interactive-attempt">
+                <span data-i18n="passwordAttempt">第 1 / 3 次密码尝试</span>
+                <small data-i18n="passwordAttemptHint">等待服务端发出 PASS_REQ 后发送</small>
+              </div>
+              <label><span class="label-text" data-i18n="currentPassword">本次密码</span>
+                <span class="password-field">
+                  <input id="interactive-password" type="password" value="secret">
+                  <button class="password-toggle" type="button" aria-label="显示密码" title="显示密码">
+                    <span class="shape-icon icon-eye" aria-hidden="true"></span>
+                  </button>
+                </span>
+              </label>
+              <button class="primary-button full-button" id="send-password-btn" type="button">
+                <span class="shape-icon icon-key" aria-hidden="true"></span>
+                <span data-i18n="sendPassword">发送密码</span>
+              </button>
+            </div>
+            <div class="button-row">
+              <button class="primary-button" type="submit">
+                <span class="shape-icon icon-play" aria-hidden="true"></span>
+                <span data-i18n="startClient">启动客户端</span>
+              </button>
+              <button class="danger-button" id="stop-client-btn" type="button">
+                <span class="shape-icon icon-stop" aria-hidden="true"></span>
+                <span data-i18n="stopClient">停止客户端</span>
+              </button>
+            </div>
+          </form>
+
+          <section class="control-section sidebar-form">
+            <div class="panel-head">
+              <h2 data-i18n="experimentControl">实验控制</h2>
+              <span class="hint" data-i18n="runHint">运行</span>
+            </div>
+            <div class="button-row">
+              <button class="ghost-button" id="reset-btn" type="button">
+                <span class="shape-icon icon-reset" aria-hidden="true"></span>
+                <span data-i18n="resetRun">重置实验</span>
+              </button>
+              <button class="ghost-button" id="clear-logs-btn" type="button">
+                <span class="shape-icon icon-trash" aria-hidden="true"></span>
+                <span data-i18n="clearLogs">清空日志</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="control-section sidebar-form test-control-panel">
+            <div class="panel-head">
+              <h2 data-i18n="testsAndSim">测试与异常模拟</h2>
+              <span class="hint" data-i18n="scriptResults">自动脚本结果</span>
+            </div>
+            <div class="test-action-grid">
+              <button class="primary-button" id="run-tests-btn" type="button" data-i18n="runTests">运行测试</button>
+              <button class="ghost-button" id="simulate-wrong-btn" type="button" data-i18n="simulateWrong">模拟认证失败</button>
+              <button class="ghost-button" id="simulate-timeout-btn" type="button" data-i18n="simulateTimeout">模拟超时</button>
+            </div>
+            <div id="test-results" class="test-results"></div>
+          </section>
+
+          <section class="control-section sidebar-form">
+            <div class="panel-head">
+              <h2 data-i18n="appearance">界面设置</h2>
+              <span class="hint" data-i18n="appearanceHint">显示</span>
+            </div>
+            <label><span class="label-text" data-i18n="language">界面语言</span>
+              <select id="language-select">
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <label><span class="label-text" data-i18n="themeSelect">风格选择</span>
+              <select id="theme-select">
+                <option value="lab" data-i18n="themeGlass">iOS 玻璃</option>
+                <option value="minimal" data-i18n="themeMinimal">极简浅色</option>
+                <option value="graphite" data-i18n="themeGraphite">极简深色</option>
+                <option value="cyber" data-i18n="themeCyber">赛博实验室</option>
+                <option value="console" data-i18n="themeConsole">深色控制台</option>
+                <option value="signal" data-i18n="themeSignal">信号看板</option>
+              </select>
+            </label>
+          </section>
+        </div>
+      </aside>
+
+      <div class="workbench">
+        <header class="topbar">
+          <div>
+            <p class="caption" data-i18n="appName">UDP 安全传输实验台</p>
+            <h1 data-i18n="topTitle">最小安全通信协议控制台</h1>
+          </div>
+          <div class="status-strip" aria-live="polite">
+            <span class="status-pill" id="server-pill">服务端：已停止</span>
+            <span class="status-pill" id="client-pill">客户端：已停止</span>
+            <span class="status-pill" id="phase-pill">阶段：INIT</span>
+            <span class="status-pill result" id="result-pill">结果：等待</span>
+          </div>
+        </header>
+
+        <nav class="tabs" aria-label="Console tabs">
+          <button class="tab is-active" data-tab="dashboard" type="button" data-i18n="tabDashboard">仪表盘</button>
+          <button class="tab" data-tab="protocol" type="button" data-i18n="tabProtocol">协议</button>
+          <button class="tab" data-tab="transfer" type="button" data-i18n="tabTransfer">传输</button>
+          <button class="tab" data-tab="logs" type="button" data-i18n="tabLogs">日志与测试</button>
+        </nav>
+
+        <main>
         <section class="tab-panel is-active" id="tab-dashboard" aria-label="Dashboard">
           <div class="dashboard-grid">
             <section class="panel hero-panel">
               <div>
-                <p class="caption">Current Run</p>
+                <p class="caption" data-i18n="currentRun">当前运行</p>
                 <h2 id="dashboard-title">等待启动</h2>
                 <p id="dashboard-summary">启动 server 和 client 后，这里会展示认证、传输和校验结果。</p>
               </div>
               <div class="phase-rail" id="dashboard-phases"></div>
             </section>
-            <section class="panel metrics-panel" id="metrics-panel"></section>
-            <section class="panel digest-panel" id="digest-panel"></section>
+            <div class="dashboard-side">
+              <section class="panel metrics-panel" id="metrics-panel"></section>
+              <section class="panel digest-panel" id="digest-panel"></section>
+            </div>
             <section class="panel recent-panel">
               <div class="panel-head">
-                <h2>最近日志</h2>
-                <button class="ghost-button" id="refresh-logs-btn" type="button">Refresh logs</button>
+                <h2 data-i18n="recentLogs">最近日志</h2>
+                <div class="button-row">
+                  <button class="ghost-button" id="refresh-logs-btn" type="button" data-i18n="refreshLogs">刷新日志</button>
+                  <button class="ghost-button" id="view-full-logs-btn" type="button" data-i18n="viewFullLogs">查看完整日志</button>
+                </div>
               </div>
               <div class="log-list compact" id="recent-logs"></div>
             </section>
-          </div>
-        </section>
-
-        <section class="tab-panel" id="tab-config" aria-label="Config">
-          <div class="config-grid">
-            <form class="panel form-panel" id="server-form">
-              <div class="panel-head">
-                <h2>Server</h2>
-                <span class="hint">./server &lt;serverport&gt; &lt;password&gt; &lt;inputfile&gt;</span>
-              </div>
-              <label>监听端口 <input name="port" inputmode="numeric" value="9000"></label>
-              <label>认证密码 <input name="password" type="password" value="secret"></label>
-              <label>输入文件 <input name="inputFile" value="test/input.txt"></label>
-              <div class="button-row">
-                <button class="primary-button" type="submit">Start server</button>
-                <button class="danger-button" id="stop-server-btn" type="button">Stop server</button>
-              </div>
-            </form>
-
-            <form class="panel form-panel" id="client-form">
-              <div class="panel-head">
-                <h2>Client</h2>
-                <span class="hint">兼容格式或交互式密码输入</span>
-              </div>
-              <label>服务器地址 <input name="host" value="127.0.0.1"></label>
-              <label>服务器端口 <input name="port" inputmode="numeric" value="9000"></label>
-              <label>输出文件 <input name="outputFile" value="output/web-output.bin"></label>
-              <fieldset class="segmented" aria-label="Password mode">
-                <label><input type="radio" name="mode" value="compat" checked> 兼容三密码</label>
-                <label><input type="radio" name="mode" value="interactive"> 交互式</label>
-              </fieldset>
-              <div class="compat-passwords" id="compat-passwords">
-                <label>clientpwd1 <input name="pwd1" type="password" value="wrong"></label>
-                <label>clientpwd2 <input name="pwd2" type="password" value="secret"></label>
-                <label>clientpwd3 <input name="pwd3" type="password" value="secret"></label>
-              </div>
-              <div class="button-row">
-                <button class="primary-button" type="submit">Start client</button>
-                <button class="danger-button" id="stop-client-btn" type="button">Stop client</button>
-              </div>
-            </form>
-
-            <section class="panel form-panel">
-              <div class="panel-head">
-                <h2>交互式密码</h2>
-                <span class="hint">收到 PASS_REQ 后写入客户端 stdin</span>
-              </div>
-              <label>本次密码 <input id="interactive-password" type="password" value="secret"></label>
-              <div class="button-row">
-                <button class="primary-button" id="send-password-btn" type="button">Send password</button>
-                <button class="ghost-button" id="clear-logs-btn" type="button">Clear logs</button>
-              </div>
-            </section>
-
-            <section class="panel state-panel" id="config-state"></section>
           </div>
         </section>
 
@@ -112,40 +253,76 @@
           <div class="protocol-grid">
             <section class="panel sequence-panel">
               <div class="panel-head">
-                <h2>协议时序</h2>
-                <span class="hint">点击任意包查看字段</span>
+                <h2 data-i18n="protocolSequence">协议时序</h2>
+              </div>
+              <div class="sequence-legend" aria-hidden="true">
+                <span data-i18n="clientEndpoint">客户端</span>
+                <span data-i18n="packetDirectionTitle">包方向</span>
+                <span data-i18n="serverEndpoint">服务端</span>
               </div>
               <div class="sequence" id="sequence-view"></div>
             </section>
             <section class="panel inspector-panel">
               <div class="panel-head">
-                <h2>Packet Inspector</h2>
-                <span class="hint">Type: 2B, PayloadLen: 4B</span>
+                <h2 data-i18n="packetInspector">包检查器</h2>
+                <span class="hint" data-i18n="packetWireHint">类型: 2B, 载荷长度: 4B</span>
               </div>
               <div id="packet-inspector"></div>
             </section>
             <section class="panel packet-table-panel">
               <div class="panel-head">
-                <h2>包列表</h2>
-                <span class="hint" id="packet-count">0 packets</span>
+                <h2 data-i18n="packetList">包列表</h2>
+                <div class="panel-tools">
+                  <span class="hint" id="packet-count">0 个包</span>
+                </div>
+              </div>
+              <div class="packet-filter-row">
+                <input id="packet-search-filter" placeholder="搜索类型、包 ID、方向或关键字" aria-label="搜索包">
+                <select id="packet-type-filter" aria-label="按包类型过滤">
+                  <option value="" data-i18n="allPacketTypes">全部包类型</option>
+                  <option>JOIN_REQ</option>
+                  <option>PASS_REQ</option>
+                  <option>PASS_RESP</option>
+                  <option>PASS_ACCEPT</option>
+                  <option>DATA</option>
+                  <option>TERMINATE</option>
+                  <option>REJECT</option>
+                </select>
+                <select id="packet-direction-filter" aria-label="按方向过滤">
+                  <option value="" data-i18n="allDirections">全部方向</option>
+                  <option value="Client -> Server" data-i18n="clientToServer">客户端到服务端</option>
+                  <option value="Server -> Client" data-i18n="serverToClient">服务端到客户端</option>
+                  <option value="Observed" data-i18n="observed">观察到</option>
+                </select>
               </div>
               <div class="table-wrap">
-                <table>
+                <table class="packet-table">
+                  <colgroup>
+                    <col class="col-index">
+                    <col class="col-time">
+                    <col class="col-direction">
+                    <col class="col-role">
+                    <col class="col-packet">
+                    <col class="col-payload">
+                    <col class="col-packet-id">
+                    <col class="col-state">
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Time</th>
-                      <th>Direction</th>
-                      <th>Role</th>
-                      <th>Packet</th>
-                      <th>Payload</th>
-                      <th>Packet ID</th>
-                      <th>State</th>
+                      <th data-i18n="time">时间</th>
+                      <th data-i18n="direction">方向</th>
+                      <th data-i18n="role">角色</th>
+                      <th data-i18n="packet">包</th>
+                      <th data-i18n="payload">载荷</th>
+                      <th data-i18n="packetId">包 ID</th>
+                      <th data-i18n="state">状态</th>
                     </tr>
                   </thead>
                   <tbody id="packet-table-body"></tbody>
                 </table>
               </div>
+              <div class="pager" id="packet-pager" aria-label="Packet pagination"></div>
             </section>
           </div>
         </section>
@@ -154,7 +331,7 @@
           <div class="transfer-grid">
             <section class="panel progress-panel">
               <div class="panel-head">
-                <h2>传输进度</h2>
+                <h2 data-i18n="transferProgress">传输进度</h2>
                 <span class="hint" id="throughput-label">0 B/s</span>
               </div>
               <div class="progress-track"><div id="transfer-progress" class="progress-fill"></div></div>
@@ -162,8 +339,8 @@
             </section>
             <section class="panel matrix-panel">
               <div class="panel-head">
-                <h2>分片矩阵</h2>
-                <span class="hint">每格代表一个 DATA packet_id</span>
+                <h2 data-i18n="fragmentMatrix">分片矩阵</h2>
+                <span class="hint" data-i18n="fragmentHint">每格代表一个 DATA packet_id</span>
               </div>
               <div class="fragment-matrix" id="fragment-matrix"></div>
             </section>
@@ -171,22 +348,22 @@
           </div>
         </section>
 
-        <section class="tab-panel" id="tab-logs" aria-label="Logs and Test">
+        <section class="tab-panel" id="tab-logs" aria-label="Logs">
           <div class="logs-grid">
             <section class="panel filters-panel">
               <div class="panel-head">
-                <h2>日志过滤</h2>
-                <span class="hint">JSON Lines</span>
+                <h2 data-i18n="logFilters">日志过滤</h2>
+                <span class="hint" data-i18n="logFormatHint">JSON 行日志</span>
               </div>
               <div class="filter-row">
                 <select id="role-filter" aria-label="Role filter">
-                  <option value="">All roles</option>
-                  <option value="server">server</option>
-                  <option value="client">client</option>
-                  <option value="control">control</option>
+                  <option value="" data-i18n="allRoles">全部角色</option>
+                  <option value="server" data-i18n="serverRole">服务端</option>
+                  <option value="client" data-i18n="clientRole">客户端</option>
+                  <option value="control" data-i18n="controlRole">控制端</option>
                 </select>
                 <select id="level-filter" aria-label="Level filter">
-                  <option value="">All levels</option>
+                  <option value="" data-i18n="allLevels">全部级别</option>
                   <option>INFO</option>
                   <option>AUTH</option>
                   <option>DATA</option>
@@ -195,32 +372,24 @@
                   <option>SUCCESS</option>
                   <option>ABORT</option>
                 </select>
-                <input id="search-filter" placeholder="Search event, state, message">
-                <label class="check-label"><input id="error-only" type="checkbox"> 只看异常</label>
+                <input id="search-filter" placeholder="搜索事件、状态、消息">
+                <label class="check-label"><input id="error-only" type="checkbox"><span data-i18n="errorsOnly">只看异常</span></label>
               </div>
             </section>
             <section class="panel log-panel">
               <div class="panel-head">
-                <h2>实时日志</h2>
-                <span class="hint" id="log-count">0 entries</span>
+                <h2 data-i18n="realtimeLogs">实时日志</h2>
+                <div class="panel-tools">
+                  <span class="hint" id="log-count">0 条记录</span>
+                </div>
               </div>
               <div class="log-list" id="full-log-list"></div>
-            </section>
-            <section class="panel test-panel">
-              <div class="panel-head">
-                <h2>测试与异常模拟</h2>
-                <span class="hint">自动脚本结果</span>
-              </div>
-              <div class="button-row">
-                <button class="primary-button" id="run-tests-btn" type="button">Run tests</button>
-                <button class="ghost-button" id="simulate-wrong-btn" type="button">Simulate wrong auth</button>
-                <button class="ghost-button" id="simulate-timeout-btn" type="button">Simulate timeout</button>
-              </div>
-              <div id="test-results" class="test-results"></div>
+              <div class="pager" id="log-pager" aria-label="Log pagination"></div>
             </section>
           </div>
         </section>
-      </main>
+        </main>
+      </div>
     </div>
 
     <script src="/js/api.js"></script>
