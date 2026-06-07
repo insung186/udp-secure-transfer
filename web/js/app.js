@@ -916,12 +916,17 @@ function setSidebarCollapsed(collapsed) {
 }
 
 function setTheme(theme) {
-  appState.theme = theme || "lab";
-  document.documentElement.dataset.theme = appState.theme;
-  const select = byId("theme-select");
-  if (select) select.value = appState.theme;
+  const target = (theme && window.ThemeManager && window.ThemeManager.themes.some((t) => t.id === theme))
+    ? theme
+    : (window.ThemeManager ? window.ThemeManager.defaultTheme : "neumorph");
+  appState.theme = target;
+  if (window.ThemeManager) {
+    window.ThemeManager.set(target);
+  } else {
+    document.documentElement.dataset.theme = target;
+  }
   try {
-    localStorage.setItem("udpLabTheme", appState.theme);
+    localStorage.setItem("udpLabTheme", target);
   } catch (error) {
     console.warn(error);
   }
@@ -971,6 +976,10 @@ function setLanguage(language, rerender = true) {
     console.warn(error);
   }
   applyLanguage();
+  // 主题卡片标签随语言刷新
+  if (window.ThemeManager && typeof window.ThemeManager.refreshLabels === "function") {
+    window.ThemeManager.refreshLabels(appState.language);
+  }
   if (rerender) render();
 }
 
@@ -1316,6 +1325,8 @@ function render() {
   renderTransfer(run);
   renderLogs();
   renderTests();
+  // 暴露给 theme-manager.js
+  window.render = render;
 }
 
 async function refreshStatus() {
@@ -1426,6 +1437,13 @@ function wireEvents() {
 
   byId("theme-select").addEventListener("change", (event) => {
     setTheme(event.currentTarget.value);
+    // 同步更新主题卡片高亮
+    if (window.ThemeManager) {
+      const cards = document.querySelectorAll('[data-theme-card]');
+      cards.forEach((card) => {
+        card.classList.toggle('is-active', card.dataset.themeCard === event.currentTarget.value);
+      });
+    }
   });
 
   byId("language-select").addEventListener("change", (event) => {
@@ -1648,12 +1666,34 @@ async function boot() {
   try {
     setLanguage(localStorage.getItem("udpLabLanguage") || "zh", false);
     setSidebarCollapsed(localStorage.getItem("udpLabSidebarCollapsed") === "1");
-    setTheme(localStorage.getItem("udpLabTheme") || "lab");
   } catch (error) {
     console.warn(error);
     setLanguage("zh", false);
-    setTheme("lab");
   }
+  // 主题：先读新版存储，再回退到旧版 lab/minimal/graphite 等映射
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem("udpLabThemeV2"); } catch (e) { /* noop */ }
+  if (!savedTheme) {
+    try { savedTheme = localStorage.getItem("udpLabTheme"); } catch (e) { /* noop */ }
+  }
+  // 旧主题 id 映射
+  const legacyMap = {
+    lab: "liquid",
+    minimal: "nordic",
+    graphite: "nordic",
+    cyber: "cyber",
+    console: "metal",
+    signal: "matcha",
+  };
+  if (savedTheme && legacyMap[savedTheme]) savedTheme = legacyMap[savedTheme];
+  if (window.ThemeManager) {
+    window.ThemeManager.init();
+    window.ThemeManager.renderPicker(
+      byId("theme-picker"),
+      appState.language
+    );
+  }
+  setTheme(savedTheme || (window.ThemeManager ? window.ThemeManager.defaultTheme : "neumorph"));
   applyLanguage();
   wireEvents();
   syncPasswordMode();

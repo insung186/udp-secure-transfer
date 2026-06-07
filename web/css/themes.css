@@ -1,0 +1,721 @@
+/* =============================================================================
+   themes.css — 9 套主题色板
+   风格参考: chroma-atlas/src/detail/styles/* 与 src/data/palettes.jsx
+   所有主题都通过 [data-theme="..."] 切换，覆盖页面背景、卡片、按钮、表格、
+   日志、协议时序、包检查器等所有视觉模块。
+   ============================================================================= */
+
+/* -----------------------------------------------------------------------------
+   1. Neumorphism 新拟态 (chroma-atlas: neumorph)
+   米灰底 + 双向投影 + 单一强调色 + 极简信息层
+   ----------------------------------------------------------------------------- */
+:root[data-theme="neumorph"] {
+  --bg: #E0E5EC;
+  --bg-gradient: radial-gradient(circle at 30% 0%, #EEF1F7 0%, #D6DBE3 100%);
+  --surface: #E0E5EC;
+  --surface-strong: #D6DBE3;
+  --sidebar: #E0E5EC;
+  --glass: #E0E5EC;
+  --glass-strong: #E6EAF1;
+  --ink: #2C3E50;
+  --muted: #6B7A8F;
+  --line: transparent;
+  --primary: #5A6A85;
+  --primary-strong: #44546A;
+  --client-flow: #5A6A85;
+  --server-flow: #7A8AB5;
+  --stage-control: #5A6A85;
+  --stage-auth: #7A5B8E;
+  --stage-data: #5C8A6A;
+  --stage-final: #B56A5A;
+  --success: #5C8A6A;
+  --warning: #C49A4A;
+  --danger: #B55A5A;
+  --code-bg: #D6DBE3;
+  --radius: 22px;
+  --control-radius: 14px;
+  --focus: 0 0 0 4px rgba(122, 138, 181, 0.45);
+  /* 双向阴影：左上白 + 右下深 */
+  --soft-shadow:
+    12px 12px 24px #B8BEC7,
+    -12px -12px 24px #FFFFFF;
+  --soft-shadow-sm:
+    4px 4px 8px #B8BEC7,
+    -4px -4px 8px #FFFFFF;
+  --soft-shadow-inset:
+    inset 4px 4px 8px #B8BEC7,
+    inset -4px -4px 8px #FFFFFF;
+  --soft-shadow-inset-sm:
+    inset 2px 2px 4px #B8BEC7,
+    inset -2px -2px 4px #FFFFFF;
+  --border-style: none;
+  --border-width: 0;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --button-radius: 999px;
+  --card-radius: 22px;
+  --accent-1: #5A6A85;
+  --accent-2: #7A8AB5;
+  --stage-color: #5A6A85;
+  --decor-blob-1: rgba(122, 138, 181, 0.18);
+  --decor-blob-2: rgba(180, 200, 220, 0.15);
+  --glow-primary: none;
+  --glow-accent: none;
+  --text-on-primary: #FFFFFF;
+  --text-on-accent: #2C3E50;
+  --grid-bg: none;
+  --scanlines-bg: none;
+  color-scheme: light;
+}
+
+/* -----------------------------------------------------------------------------
+   2. Aurora 极光辉光 (chroma-atlas: aurora)
+   深夜蓝紫 + 极光绿 + 紫色流光 + 渐变光晕
+   ----------------------------------------------------------------------------- */
+:root[data-theme="aurora"] {
+  --bg: #0A1A2E;
+  --bg-gradient:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(91, 255, 181, 0.18), transparent 60%),
+    radial-gradient(ellipse 70% 60% at 90% 30%, rgba(155, 91, 255, 0.22), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 60% 100%, rgba(91, 181, 255, 0.20), transparent 60%),
+    linear-gradient(180deg, #0A1A2E 0%, #152A45 100%);
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-strong: rgba(255, 255, 255, 0.10);
+  --sidebar: rgba(15, 25, 45, 0.78);
+  --glass: rgba(255, 255, 255, 0.06);
+  --glass-strong: rgba(255, 255, 255, 0.10);
+  --ink: #E5F5F0;
+  --muted: rgba(229, 245, 240, 0.65);
+  --line: rgba(91, 255, 181, 0.20);
+  --primary: #5BFFB5;
+  --primary-strong: #4AE8A0;
+  --client-flow: #5BB5FF;
+  --server-flow: #9B5BFF;
+  --stage-control: #5BB5FF;
+  --stage-auth: #9B5BFF;
+  --stage-data: #5BFFB5;
+  --stage-final: #FF6B9D;
+  --success: #5BFFB5;
+  --warning: #FFD93D;
+  --danger: #FF6B9D;
+  --code-bg: rgba(0, 0, 0, 0.35);
+  --radius: 18px;
+  --control-radius: 12px;
+  --focus: 0 0 0 3px rgba(91, 255, 181, 0.55);
+  --soft-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --soft-shadow-sm:
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --soft-shadow-inset:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --soft-shadow-inset-sm:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --border-style: solid;
+  --border-width: 1px;
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --button-radius: 12px;
+  --card-radius: 18px;
+  --accent-1: #5BFFB5;
+  --accent-2: #9B5BFF;
+  --stage-color: #5BFFB5;
+  --decor-blob-1: rgba(91, 255, 181, 0.30);
+  --decor-blob-2: rgba(155, 91, 255, 0.30);
+  --glow-primary: 0 0 14px rgba(91, 255, 181, 0.45);
+  --glow-accent: 0 0 14px rgba(155, 91, 255, 0.40);
+  --text-on-primary: #06281E;
+  --text-on-accent: #FFFFFF;
+  --grid-bg:
+    linear-gradient(rgba(91, 255, 181, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(91, 255, 181, 0.05) 1px, transparent 1px);
+  --grid-size: 40px 40px;
+  --scanlines-bg: none;
+  color-scheme: dark;
+}
+
+/* -----------------------------------------------------------------------------
+   3. Cartoon 卡通 (chroma-atlas: cartoon)
+   黄色背景 + 黑色粗描边 + 硬阴影偏移 + 圆润字体
+   ----------------------------------------------------------------------------- */
+:root[data-theme="cartoon"] {
+  --bg: #FFE066;
+  --bg-gradient:
+    radial-gradient(circle at 20% 10%, #FFEFA0 0%, #FFE066 50%, #FFCB3F 100%);
+  --surface: #FFFFFF;
+  --surface-strong: #FFF7CC;
+  --sidebar: #FFE066;
+  --glass: #FFFFFF;
+  --glass-strong: #FFFFFF;
+  --ink: #0F0F0F;
+  --muted: #3A3A3A;
+  --line: #0F0F0F;
+  --primary: #FF4FA8;
+  --primary-strong: #E63A93;
+  --client-flow: #4ECDC4;
+  --server-flow: #FF6B6B;
+  --stage-control: #4ECDC4;
+  --stage-auth: #FF4FA8;
+  --stage-data: #FFD93D;
+  --stage-final: #FF6B6B;
+  --success: #4ECDC4;
+  --warning: #FFB84D;
+  --danger: #FF6B6B;
+  --code-bg: #FFF7CC;
+  --radius: 18px;
+  --control-radius: 14px;
+  --focus: 0 0 0 4px rgba(255, 79, 168, 0.55);
+  --soft-shadow: 6px 6px 0 #0F0F0F;
+  --soft-shadow-sm: 3px 3px 0 #0F0F0F;
+  --soft-shadow-inset: none;
+  --soft-shadow-inset-sm: none;
+  --border-style: solid;
+  --border-width: 3px;
+  --font-family: "Comic Sans MS", "Marker Felt", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --button-radius: 999px;
+  --card-radius: 18px;
+  --accent-1: #FF4FA8;
+  --accent-2: #4ECDC4;
+  --stage-color: #FF4FA8;
+  --decor-blob-1: rgba(255, 79, 168, 0.20);
+  --decor-blob-2: rgba(78, 205, 196, 0.20);
+  --glow-primary: none;
+  --glow-accent: none;
+  --text-on-primary: #FFFFFF;
+  --text-on-accent: #0F0F0F;
+  --grid-bg: none;
+  --scanlines-bg: none;
+  color-scheme: light;
+}
+
+/* -----------------------------------------------------------------------------
+   4. Cyberpunk 赛博朋克 (chroma-atlas: cyber)
+   深紫底 + 霓虹粉青 + 等宽字体 + 扫描线 + 荧光描边
+   ----------------------------------------------------------------------------- */
+:root[data-theme="cyber"] {
+  --bg: #0A0118;
+  --bg-gradient:
+    linear-gradient(135deg, #0A0118 0%, #1A0A2E 60%, #2A0A38 100%),
+    radial-gradient(circle at 80% 10%, rgba(255, 46, 151, 0.18), transparent 50%),
+    radial-gradient(circle at 10% 90%, rgba(0, 240, 255, 0.15), transparent 50%);
+  --surface: #1A0A2E;
+  --surface-strong: #2A0A38;
+  --sidebar: rgba(10, 1, 24, 0.84);
+  --glass: rgba(26, 10, 46, 0.78);
+  --glass-strong: rgba(26, 10, 46, 0.92);
+  --ink: #E5D9FF;
+  --muted: #8E7AB5;
+  --line: #3A1F5C;
+  --primary: #FF2E97;
+  --primary-strong: #E61E80;
+  --client-flow: #00F0FF;
+  --server-flow: #FF2E97;
+  --stage-control: #00F0FF;
+  --stage-auth: #FF2E97;
+  --stage-data: #A100FF;
+  --stage-final: #FFD600;
+  --success: #5BFFB5;
+  --warning: #FFD600;
+  --danger: #FF2E97;
+  --code-bg: rgba(0, 0, 0, 0.5);
+  --radius: 4px;
+  --control-radius: 4px;
+  --focus: 0 0 0 3px rgba(0, 240, 255, 0.65);
+  --soft-shadow:
+    0 0 0 1px rgba(0, 240, 255, 0.10) inset,
+    0 8px 24px rgba(255, 46, 151, 0.18);
+  --soft-shadow-sm:
+    0 0 0 1px rgba(0, 240, 255, 0.10) inset,
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  --soft-shadow-inset: none;
+  --soft-shadow-inset-sm: none;
+  --border-style: solid;
+  --border-width: 1px;
+  --font-family: "JetBrains Mono", "Fira Code", "Courier New", "Consolas", monospace;
+  --button-radius: 4px;
+  --card-radius: 4px;
+  --accent-1: #FF2E97;
+  --accent-2: #00F0FF;
+  --stage-color: #FF2E97;
+  --decor-blob-1: rgba(0, 240, 255, 0.10);
+  --decor-blob-2: rgba(255, 46, 151, 0.10);
+  --glow-primary: 0 0 12px rgba(255, 46, 151, 0.55), 0 0 24px rgba(255, 46, 151, 0.20);
+  --glow-accent: 0 0 12px rgba(0, 240, 255, 0.55), 0 0 24px rgba(0, 240, 255, 0.20);
+  --text-on-primary: #FFFFFF;
+  --text-on-accent: #0A0118;
+  --grid-bg:
+    linear-gradient(rgba(0, 240, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.06) 1px, transparent 1px);
+  --grid-size: 40px 40px;
+  --scanlines-bg: repeating-linear-gradient(
+    0deg,
+    transparent 0,
+    transparent 3px,
+    rgba(0, 240, 255, 0.04) 3px,
+    rgba(0, 240, 255, 0.04) 4px
+  );
+  color-scheme: dark;
+}
+
+/* -----------------------------------------------------------------------------
+   5. Sticker 贴纸 (chroma-atlas: sticker)
+   浅蓝底 + 错位硬阴影 + 卡通字体 + 多色装饰
+   ----------------------------------------------------------------------------- */
+:root[data-theme="sticker"] {
+  --bg: #A8D8FF;
+  --bg-gradient:
+    radial-gradient(circle at 20% 20%, #C5E4FF 0%, #A8D8FF 60%, #8AC8F5 100%);
+  --surface: #FFFFFF;
+  --surface-strong: #FFF7CC;
+  --sidebar: #A8D8FF;
+  --glass: #FFFFFF;
+  --glass-strong: #FFFFFF;
+  --ink: #0F2848;
+  --muted: #3A5878;
+  --line: #0F2848;
+  --primary: #FF6B6B;
+  --primary-strong: #E64F4F;
+  --client-flow: #FFD93D;
+  --server-flow: #FF6B6B;
+  --stage-control: #FFD93D;
+  --stage-auth: #FF6B6B;
+  --stage-data: #4ECDC4;
+  --stage-final: #5BC8FF;
+  --success: #4ECDC4;
+  --warning: #FFD93D;
+  --danger: #FF6B6B;
+  --code-bg: #FFF7CC;
+  --radius: 16px;
+  --control-radius: 12px;
+  --focus: 0 0 0 4px rgba(255, 107, 107, 0.45);
+  --soft-shadow: 4px 4px 0 #0F2848;
+  --soft-shadow-sm: 2px 2px 0 #0F2848;
+  --soft-shadow-inset: none;
+  --soft-shadow-inset-sm: none;
+  --border-style: solid;
+  --border-width: 2.5px;
+  --font-family: "Comic Sans MS", "Marker Felt", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --button-radius: 14px;
+  --card-radius: 16px;
+  --accent-1: #FF6B6B;
+  --accent-2: #FFD93D;
+  --stage-color: #FF6B6B;
+  --decor-blob-1: rgba(255, 217, 61, 0.35);
+  --decor-blob-2: rgba(91, 200, 255, 0.30);
+  --glow-primary: none;
+  --glow-accent: none;
+  --text-on-primary: #FFFFFF;
+  --text-on-accent: #0F2848;
+  --grid-bg: none;
+  --scanlines-bg: none;
+  color-scheme: light;
+}
+
+/* -----------------------------------------------------------------------------
+   6. Nordic 北欧冷雾 (chroma-atlas: nordic palette + softui 风格)
+   冷灰蓝调 + 安静克制 + 微阴影
+   ----------------------------------------------------------------------------- */
+:root[data-theme="nordic"] {
+  --bg: #ECEFF1;
+  --bg-gradient:
+    linear-gradient(180deg, #F5F7F8 0%, #ECEFF1 50%, #DDE3E7 100%);
+  --surface: #F5F7F8;
+  --surface-strong: #DDE3E7;
+  --sidebar: #ECEFF1;
+  --glass: #F5F7F8;
+  --glass-strong: #FFFFFF;
+  --ink: #1F2A33;
+  --muted: #5A6E7A;
+  --line: #D5DCE0;
+  --primary: #3E5C76;
+  --primary-strong: #2E4860;
+  --client-flow: #3E5C76;
+  --server-flow: #7A99B5;
+  --stage-control: #3E5C76;
+  --stage-auth: #5A6E7A;
+  --stage-data: #7A99B5;
+  --stage-final: #B5C4CE;
+  --success: #5C8A6A;
+  --warning: #C49A4A;
+  --danger: #B55A5A;
+  --code-bg: #DDE3E7;
+  --radius: 14px;
+  --control-radius: 10px;
+  --focus: 0 0 0 3px rgba(62, 92, 118, 0.40);
+  --soft-shadow:
+    0 1px 2px rgba(31, 42, 51, 0.04),
+    0 8px 24px rgba(31, 42, 51, 0.06);
+  --soft-shadow-sm:
+    0 1px 2px rgba(31, 42, 51, 0.04),
+    0 4px 12px rgba(31, 42, 51, 0.05);
+  --soft-shadow-inset: none;
+  --soft-shadow-inset-sm: none;
+  --border-style: solid;
+  --border-width: 1px;
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --button-radius: 10px;
+  --card-radius: 14px;
+  --accent-1: #3E5C76;
+  --accent-2: #7A99B5;
+  --stage-color: #3E5C76;
+  --decor-blob-1: rgba(62, 92, 118, 0.10);
+  --decor-blob-2: rgba(122, 153, 181, 0.10);
+  --glow-primary: none;
+  --glow-accent: none;
+  --text-on-primary: #FFFFFF;
+  --text-on-accent: #1F2A33;
+  --grid-bg: none;
+  --scanlines-bg: none;
+  color-scheme: light;
+}
+
+/* -----------------------------------------------------------------------------
+   7. Liquid Glass 流体光感 (chroma-atlas: liquid)
+   渐变彩色底 + 玻璃半透 + 高光反射 + 柔光
+   ----------------------------------------------------------------------------- */
+:root[data-theme="liquid"] {
+  --bg: #D1C5FF;
+  --bg-gradient:
+    radial-gradient(ellipse at top left, #FFE5F0 0%, #E5F0FF 40%, #F0E5FF 100%),
+    linear-gradient(180deg, #FFD1E8 0%, #C5E1FF 50%, #D1C5FF 100%);
+  --surface: rgba(255, 255, 255, 0.40);
+  --surface-strong: rgba(255, 255, 255, 0.55);
+  --sidebar: rgba(255, 255, 255, 0.32);
+  --glass: rgba(255, 255, 255, 0.40);
+  --glass-strong: rgba(255, 255, 255, 0.55);
+  --ink: #1A1438;
+  --muted: #5A4A78;
+  --line: rgba(255, 255, 255, 0.55);
+  --primary: #5C3D99;
+  --primary-strong: #4A2E80;
+  --client-flow: #5C3D99;
+  --server-flow: #FF6B9D;
+  --stage-control: #5C3D99;
+  --stage-auth: #FF6B9D;
+  --stage-data: #5BC8FF;
+  --stage-final: #FFD93D;
+  --success: #5BC8FF;
+  --warning: #FFB84D;
+  --danger: #FF6B9D;
+  --code-bg: rgba(255, 255, 255, 0.55);
+  --radius: 24px;
+  --control-radius: 18px;
+  --focus: 0 0 0 4px rgba(92, 61, 153, 0.45);
+  --soft-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.8),
+    0 12px 32px rgba(180, 160, 220, 0.30);
+  --soft-shadow-sm:
+    inset 0 1px 1px rgba(255, 255, 255, 0.7),
+    0 4px 12px rgba(180, 160, 220, 0.20);
+  --soft-shadow-inset: inset 0 1px 1px rgba(255, 255, 255, 0.7);
+  --soft-shadow-inset-sm: inset 0 1px 1px rgba(255, 255, 255, 0.6);
+  --border-style: solid;
+  --border-width: 1px;
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --button-radius: 999px;
+  --card-radius: 24px;
+  --accent-1: #5C3D99;
+  --accent-2: #FF6B9D;
+  --stage-color: #5C3D99;
+  --decor-blob-1: rgba(255, 180, 220, 0.45);
+  --decor-blob-2: rgba(180, 200, 255, 0.45);
+  --glow-primary: 0 6px 20px rgba(92, 61, 153, 0.30);
+  --glow-accent: 0 6px 20px rgba(255, 107, 157, 0.30);
+  --text-on-primary: #FFFFFF;
+  --text-on-accent: #FFFFFF;
+  --grid-bg: none;
+  --scanlines-bg: none;
+  color-scheme: light;
+}
+
+/* -----------------------------------------------------------------------------
+   8. Embossed Metal 金属 (chroma-atlas: metal)
+   暗灰底 + 金色强调 + 内嵌 LCD 屏 + 拉丝感
+   ----------------------------------------------------------------------------- */
+:root[data-theme="metal"] {
+  --bg: #1A1A1A;
+  --bg-gradient:
+    linear-gradient(180deg, #2A2A2A 0%, #1A1A1A 50%, #0F0F0F 100%);
+  --surface: #262626;
+  --surface-strong: #2F2F2F;
+  --sidebar: #1A1A1A;
+  --glass: #2A2A2A;
+  --glass-strong: #2F2F2F;
+  --ink: #F5E6B8;
+  --muted: #C9B57A;
+  --line: #6B6B6B;
+  --primary: #D4B25F;
+  --primary-strong: #B89A4F;
+  --client-flow: #D4B25F;
+  --server-flow: #F5B83A;
+  --stage-control: #D4B25F;
+  --stage-auth: #F5B83A;
+  --stage-data: #C9B57A;
+  --stage-final: #B89A4F;
+  --success: #C9B57A;
+  --warning: #F5B83A;
+  --danger: #E84A1F;
+  --code-bg: #0F0F0F;
+  --radius: 10px;
+  --control-radius: 8px;
+  --focus: 0 0 0 3px rgba(212, 178, 95, 0.45);
+  --soft-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.40),
+    0 6px 16px rgba(0, 0, 0, 0.5);
+  --soft-shadow-sm:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.40),
+    0 3px 8px rgba(0, 0, 0, 0.4);
+  --soft-shadow-inset:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.40);
+  --soft-shadow-inset-sm:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.40);
+  --border-style: solid;
+  --border-width: 1px;
+  --font-family: "Courier New", "JetBrains Mono", "Consolas", monospace;
+  --button-radius: 6px;
+  --card-radius: 10px;
+  --accent-1: #D4B25F;
+  --accent-2: #F5B83A;
+  --stage-color: #D4B25F;
+  --decor-blob-1: rgba(212, 178, 95, 0.12);
+  --decor-blob-2: rgba(245, 184, 58, 0.10);
+  --glow-primary: 0 0 12px rgba(212, 178, 95, 0.30);
+  --glow-accent: 0 0 10px rgba(245, 184, 58, 0.30);
+  --text-on-primary: #1A1A1A;
+  --text-on-accent: #1A1A1A;
+  --grid-bg:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 2px,
+      rgba(212, 178, 95, 0.04) 2px,
+      rgba(212, 178, 95, 0.04) 3px
+    );
+  --scanlines-bg: none;
+  color-scheme: dark;
+}
+
+/* -----------------------------------------------------------------------------
+   9. Matcha 抹茶 (chroma-atlas: matcha palette + 黏土圆角风格)
+   日式抹茶绿 + 米色 + 圆角 + 陶瓷感
+   ----------------------------------------------------------------------------- */
+:root[data-theme="matcha"] {
+  --bg: #EDEDDF;
+  --bg-gradient:
+    linear-gradient(180deg, #F5F4E8 0%, #EDEDDF 60%, #DCDCC4 100%);
+  --surface: #F5F4E8;
+  --surface-strong: #E0DFC8;
+  --sidebar: #EDEDDF;
+  --glass: #F5F4E8;
+  --glass-strong: #FAFAF0;
+  --ink: #2E3A24;
+  --muted: #6B7A53;
+  --line: #D8D8C0;
+  --primary: #7A9059;
+  --primary-strong: #5C7340;
+  --client-flow: #7A9059;
+  --server-flow: #A8B57A;
+  --stage-control: #7A9059;
+  --stage-auth: #6B7A53;
+  --stage-data: #A8B57A;
+  --stage-final: #B84418;
+  --success: #7A9059;
+  --warning: #C49A4A;
+  --danger: #B84418;
+  --code-bg: #E0DFC8;
+  --radius: 16px;
+  --control-radius: 12px;
+  --focus: 0 0 0 3px rgba(122, 144, 89, 0.45);
+  --soft-shadow:
+    0 1px 2px rgba(46, 58, 36, 0.05),
+    0 6px 18px rgba(46, 58, 36, 0.08);
+  --soft-shadow-sm:
+    0 1px 2px rgba(46, 58, 36, 0.04),
+    0 3px 10px rgba(46, 58, 36, 0.06);
+  --soft-shadow-inset: none;
+  --soft-shadow-inset-sm: none;
+  --border-style: solid;
+  --border-width: 1px;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --button-radius: 12px;
+  --card-radius: 16px;
+  --accent-1: #7A9059;
+  --accent-2: #A8B57A;
+  --stage-color: #7A9059;
+  --decor-blob-1: rgba(122, 144, 89, 0.18);
+  --decor-blob-2: rgba(168, 181, 122, 0.18);
+  --glow-primary: none;
+  --glow-accent: none;
+  --text-on-primary: #FFFFFF;
+  --text-on-accent: #2E3A24;
+  --grid-bg: none;
+  --scanlines-bg: none;
+  color-scheme: light;
+}
+
+/* =============================================================================
+   全局主题装饰层
+   主题切换时背景光斑/扫描线/网格层随之变化。
+   ============================================================================= */
+.theme-decor {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.theme-decor-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 360ms ease;
+}
+
+.theme-decor-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 360ms ease;
+}
+
+.theme-decor-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 360ms ease;
+}
+
+@keyframes aurora-flow {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(20px, -30px) scale(1.1); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes aurora-flow-2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(-30px, 20px) scale(1.15); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+:root[data-theme="aurora"] .theme-decor-blob-1 {
+  width: 480px;
+  height: 480px;
+  background: var(--decor-blob-1);
+  top: -80px;
+  left: -60px;
+  animation: aurora-flow 12s ease-in-out infinite;
+}
+:root[data-theme="aurora"] .theme-decor-blob-2 {
+  width: 520px;
+  height: 520px;
+  background: var(--decor-blob-2);
+  bottom: -120px;
+  right: -80px;
+  animation: aurora-flow-2 16s ease-in-out infinite;
+}
+:root[data-theme="aurora"] .theme-decor-blob-3 {
+  width: 360px;
+  height: 360px;
+  background: rgba(91, 181, 255, 0.18);
+  top: 30%;
+  left: 40%;
+  animation: aurora-flow 18s ease-in-out infinite;
+}
+
+:root[data-theme="liquid"] .theme-decor-blob-1 {
+  width: 420px;
+  height: 420px;
+  background: var(--decor-blob-1);
+  top: -80px;
+  right: -80px;
+}
+:root[data-theme="liquid"] .theme-decor-blob-2 {
+  width: 460px;
+  height: 460px;
+  background: var(--decor-blob-2);
+  bottom: -120px;
+  left: -80px;
+}
+:root[data-theme="liquid"] .theme-decor-blob-3 {
+  width: 320px;
+  height: 320px;
+  background: rgba(255, 217, 61, 0.30);
+  top: 40%;
+  left: 30%;
+}
+
+:root[data-theme="cartoon"] .theme-decor-blob-1,
+:root[data-theme="sticker"] .theme-decor-blob-1 {
+  width: 380px;
+  height: 380px;
+  background: var(--decor-blob-1);
+  top: -100px;
+  right: -60px;
+  border-radius: 50%;
+  border: 4px solid #0F0F0F;
+  filter: none;
+  opacity: 0.4;
+}
+:root[data-theme="cartoon"] .theme-decor-blob-2,
+:root[data-theme="sticker"] .theme-decor-blob-2 {
+  width: 220px;
+  height: 220px;
+  background: var(--decor-blob-2);
+  bottom: 100px;
+  left: -60px;
+  border-radius: 50%;
+  border: 4px solid #0F0F0F;
+  filter: none;
+  opacity: 0.4;
+}
+
+:root[data-theme="metal"] .theme-decor-blob-1 {
+  width: 480px;
+  height: 480px;
+  background: var(--decor-blob-1);
+  top: -80px;
+  right: -120px;
+  filter: blur(80px);
+}
+:root[data-theme="metal"] .theme-decor-blob-2 {
+  width: 360px;
+  height: 360px;
+  background: var(--decor-blob-2);
+  bottom: -100px;
+  left: -80px;
+  filter: blur(80px);
+}
+
+:root[data-theme="neumorph"] .theme-decor-blob-1,
+:root[data-theme="nordic"] .theme-decor-blob-1,
+:root[data-theme="matcha"] .theme-decor-blob-1 {
+  width: 380px;
+  height: 380px;
+  background: var(--decor-blob-1);
+  top: -100px;
+  right: -80px;
+  filter: blur(50px);
+}
+:root[data-theme="neumorph"] .theme-decor-blob-2,
+:root[data-theme="nordic"] .theme-decor-blob-2,
+:root[data-theme="matcha"] .theme-decor-blob-2 {
+  width: 320px;
+  height: 320px;
+  background: var(--decor-blob-2);
+  bottom: -100px;
+  left: -60px;
+  filter: blur(50px);
+}
+
+/* 装饰层默认隐藏不使用的元素 */
+:root[data-theme="cyber"] .theme-decor-blob-1,
+:root[data-theme="cyber"] .theme-decor-blob-2,
+:root[data-theme="cyber"] .theme-decor-blob-3 {
+  display: none;
+}

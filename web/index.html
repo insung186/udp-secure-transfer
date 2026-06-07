@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>UDP 安全传输实验台</title>
+    <link rel="stylesheet" href="/css/themes.css">
     <link rel="stylesheet" href="/css/style.css">
   </head>
   <body>
@@ -187,15 +188,12 @@
               </select>
             </label>
             <label><span class="label-text" data-i18n="themeSelect">风格选择</span>
-              <select id="theme-select">
-                <option value="lab" data-i18n="themeGlass">iOS 玻璃</option>
-                <option value="minimal" data-i18n="themeMinimal">极简浅色</option>
-                <option value="graphite" data-i18n="themeGraphite">极简深色</option>
-                <option value="cyber" data-i18n="themeCyber">赛博实验室</option>
-                <option value="console" data-i18n="themeConsole">深色控制台</option>
-                <option value="signal" data-i18n="themeSignal">信号看板</option>
-              </select>
+              <select id="theme-select"></select>
             </label>
+            <div>
+              <span class="label-text" style="display:block;margin-bottom:6px;" data-i18n="themeSelect">风格选择</span>
+              <div id="theme-picker" class="theme-card-grid" role="group" aria-label="主题卡片"></div>
+            </div>
           </section>
         </div>
       </aside>
@@ -393,6 +391,7 @@
     </div>
 
     <script src="/js/api.js"></script>
+    <script src="/js/theme-manager.js"></script>
     <script src="/js/app.js"></script>
   </body>
 </html>
