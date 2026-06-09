@@ -574,20 +574,13 @@ static void append_log_array(char *json, size_t cap, const char *key, const char
     appendf(json, cap, "]");
 }
 
-/* 写入一条结构化 packet 记录。
-   path: 结构化包存储文件路径（logs/packets.jsonl）
-   不在 backend 做跨 run 去重——同一 packet_uid 可能属于不同 run/flow（不同输入）。
-   跨 run 去重交给前端的 buildRealPackets 处理（key = flow_id + packet_uid）。
-   同一 run 内 client/server 双端记录由前端基于 packet_uid 配对去重。*/
-static int append_packet_record(const char *path, const char *line) {
-    if (!path || !line || line[0] != '{') return -1;
-    FILE *wfp = fopen(path, "a");
-    if (!wfp) return -1;
-    fputs(line, wfp);
-    fputc('\n', wfp);
-    fclose(wfp);
-    return 0;
-}
+/* packets.jsonl 的设计（被 api_packets() 维护）：
+   每个 wire packet 一条记录，由 api_packets() 调用时按 packet_uid 合并 + sender-side
+   优选后写入。每次调用都整文件重写：
+   - 当前 logs 里出现的每个 uid：选 sender-side 行（role 与 direction 的 from 端匹配）
+   - 当前 logs 里不存在的旧 uid：保留为 orphan（属于历史 flow）
+   - role 字段在 packets.jsonl 里表示"该包的发送方角色"（client 或 server）
+   跨 run / 跨 flow 的最终去重交给前端的 buildRealPackets（key = flow_id + packet_uid）。*/
 
 static void append_packet_array(char *json, size_t cap, const char *path) {
     FILE *fp = fopen(path, "r");
@@ -643,43 +636,21 @@ static void line_uid_key(const char *line, char *out, size_t out_size) {
     }
 }
 
-/* 读取 packets.jsonl 已有 uid 集合（用于跨 run 去重） */
-static char **load_existing_uids(const char *path, size_t *out_n) {
-    *out_n = 0;
-    FILE *fp = fopen(path, "r");
-    if (!fp) return NULL;
-    char **arr = NULL;
-    size_t cap = 0;
-    char line[2048];
-    while (fgets(line, sizeof(line), fp)) {
-        char uid[64];
-        line_uid_key(line, uid, sizeof(uid));
-        if (!uid[0]) continue;
-        if (*out_n >= cap) {
-            cap = cap ? cap * 2 : 64;
-            arr = realloc(arr, cap * sizeof(char *));
-        }
-        if (arr) {
-            arr[*out_n] = strdup(uid);
-            (*out_n)++;
-        }
+/* 从一行日志里提取 direction 字段（"Client -> Server" / "Server -> Client"）。
+   用于 api_packets 选取 sender-side 记录：direction 描述包在网络中的真实方向，
+   由此可推知发送方角色（"from" 端）。 */
+static void line_direction(const char *line, char *out, size_t out_size) {
+    out[0] = '\0';
+    if (!line) return;
+    const char *p = strstr(line, "\"direction\":\"");
+    if (!p) return;
+    p += 13;
+    const char *end = strchr(p, '"');
+    if (end && (size_t)(end - p) < out_size) {
+        size_t n = (size_t)(end - p);
+        memcpy(out, p, n);
+        out[n] = '\0';
     }
-    fclose(fp);
-    return arr;
-}
-
-static int uid_in_set(char **set, size_t n, const char *uid) {
-    if (!uid || !uid[0]) return 0;
-    for (size_t i = 0; i < n; i++) {
-        if (set[i] && strcmp(set[i], uid) == 0) return 1;
-    }
-    return 0;
-}
-
-static void free_uid_set(char **set, size_t n) {
-    if (!set) return;
-    for (size_t i = 0; i < n; i++) free(set[i]);
-    free(set);
 }
 
 static void api_packets(int fd) {
@@ -688,39 +659,143 @@ static void api_packets(int fd) {
         send_http(fd, "500 Internal Server Error", "application/json", "{\"error\":\"oom\"}");
         return;
     }
-    /* 增量追加：每次请求都扫描 server/client log，将尚未记录在 packets.jsonl 中的
-       packet 行追加进去；这样多次 run 都能累积，reset 后会自动重新建立。 */
-    size_t existing_n = 0;
-    char **existing = load_existing_uids("logs/packets.jsonl", &existing_n);
+    /* packets.jsonl 维护策略：
+       每次请求都扫描 server.jsonl + client.jsonl，按 packet_uid 合并成 pair，
+       然后为每个 pair 选 sender-side 记录（role 与 direction 的 from 端匹配）。
+       最后把 packets.jsonl 整文件重写：
+         - 老记录里 uid 在当前 logs 中仍有 → 替换为新算法选出的 sender-side 行
+         - 老记录里 uid 在当前 logs 中已无（orphan from old runs）→ 保留
+       这样算法一旦更新（比如 sender-side 选择变了），旧记录会被自动替换；
+       而属于"历史 flow 但当前没在 logs"的记录不会丢失。 */
+    typedef struct {
+        char uid[64];
+        char server_line[8192];
+        char client_line[8192];
+    } PacketPair;
+    PacketPair *pairs = NULL;
+    size_t pairs_n = 0;
+    size_t pairs_cap = 0;
     const char *log_paths[] = {"logs/server.jsonl", "logs/client.jsonl"};
-    for (size_t i = 0; i < sizeof(log_paths) / sizeof(log_paths[0]); i++) {
-        FILE *lfp = fopen(log_paths[i], "r");
+    for (size_t li = 0; li < sizeof(log_paths) / sizeof(log_paths[0]); li++) {
+        FILE *lfp = fopen(log_paths[li], "r");
         if (!lfp) continue;
         char line[8192];
         while (fgets(line, sizeof(line), lfp)) {
             if (!is_packet_log_line(line)) continue;
+            size_t len = strlen(line);
+            while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+                line[--len] = '\0';
+            }
             char uid[64];
             line_uid_key(line, uid, sizeof(uid));
-            if (uid[0] && !uid_in_set(existing, existing_n, uid)) {
-                size_t len = strlen(line);
-                while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
-                    line[--len] = '\0';
+            if (!uid[0]) continue;
+            size_t idx = pairs_n;
+            for (size_t i = 0; i < pairs_n; i++) {
+                if (strcmp(pairs[i].uid, uid) == 0) { idx = i; break; }
+            }
+            if (idx == pairs_n) {
+                if (pairs_n >= pairs_cap) {
+                    size_t new_cap = pairs_cap ? pairs_cap * 2 : 32;
+                    PacketPair *new_arr = realloc(pairs, new_cap * sizeof(PacketPair));
+                    if (!new_arr) break;
+                    pairs = new_arr;
+                    pairs_cap = new_cap;
                 }
-                append_packet_record("logs/packets.jsonl", line);
-                /* 维护内存中的 uid 集合，避免同一次请求内重复 */
-                if (existing_n % 64 == 0) {
-                    char **new_arr = realloc(existing, (existing_n + 64) * sizeof(char *));
-                    if (new_arr) existing = new_arr;
-                }
-                if (existing) {
-                    existing[existing_n] = strdup(uid);
-                    existing_n++;
-                }
+                memset(&pairs[idx], 0, sizeof(PacketPair));
+                snprintf(pairs[idx].uid, sizeof(pairs[idx].uid), "%s", uid);
+                pairs_n++;
+            }
+            if (li == 0) {
+                snprintf(pairs[idx].server_line, sizeof(pairs[idx].server_line), "%s", line);
+            } else {
+                snprintf(pairs[idx].client_line, sizeof(pairs[idx].client_line), "%s", line);
             }
         }
         fclose(lfp);
     }
-    free_uid_set(existing, existing_n);
+
+    /* 读取 packets.jsonl 已有的所有行（用于识别 orphan） */
+    typedef struct {
+        char uid[64];
+        char line[8192];
+    } ExistingLine;
+    ExistingLine *existing_lines = NULL;
+    size_t existing_lines_n = 0;
+    size_t existing_lines_cap = 0;
+    FILE *rfp = fopen("logs/packets.jsonl", "r");
+    if (rfp) {
+        char line[8192];
+        while (fgets(line, sizeof(line), rfp)) {
+            size_t len = strlen(line);
+            while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+                line[--len] = '\0';
+            }
+            if (line[0] != '{') continue;
+            char uid[64];
+            line_uid_key(line, uid, sizeof(uid));
+            if (!uid[0]) continue;
+            if (existing_lines_n >= existing_lines_cap) {
+                size_t new_cap = existing_lines_cap ? existing_lines_cap * 2 : 32;
+                ExistingLine *new_arr = realloc(existing_lines, new_cap * sizeof(ExistingLine));
+                if (!new_arr) break;
+                existing_lines = new_arr;
+                existing_lines_cap = new_cap;
+            }
+            snprintf(existing_lines[existing_lines_n].uid,
+                     sizeof(existing_lines[existing_lines_n].uid), "%s", uid);
+            snprintf(existing_lines[existing_lines_n].line,
+                     sizeof(existing_lines[existing_lines_n].line), "%s", line);
+            existing_lines_n++;
+        }
+        fclose(rfp);
+    }
+
+    /* 重写 packets.jsonl：先写 orphan（uid 不在当前 logs 的旧记录），再写每个 pair 的 sender-side */
+    FILE *wfp = fopen("logs/packets.jsonl.tmp", "w");
+    if (wfp) {
+        for (size_t i = 0; i < existing_lines_n; i++) {
+            int is_replaced = 0;
+            for (size_t j = 0; j < pairs_n; j++) {
+                if (strcmp(existing_lines[i].uid, pairs[j].uid) == 0) {
+                    is_replaced = 1;
+                    break;
+                }
+            }
+            if (!is_replaced) {
+                fputs(existing_lines[i].line, wfp);
+                fputc('\n', wfp);
+            }
+        }
+        for (size_t i = 0; i < pairs_n; i++) {
+            const char *picked = NULL;
+            int have_server = pairs[i].server_line[0] != '\0';
+            int have_client = pairs[i].client_line[0] != '\0';
+            if (have_server && have_client) {
+                char dir[32] = "";
+                line_direction(pairs[i].server_line, dir, sizeof(dir));
+                if (strcmp(dir, "Server -> Client") == 0) {
+                    picked = pairs[i].server_line;
+                } else if (strcmp(dir, "Client -> Server") == 0) {
+                    picked = pairs[i].client_line;
+                } else {
+                    picked = pairs[i].server_line;
+                }
+            } else if (have_server) {
+                picked = pairs[i].server_line;
+            } else if (have_client) {
+                picked = pairs[i].client_line;
+            }
+            if (picked) {
+                fputs(picked, wfp);
+                fputc('\n', wfp);
+            }
+        }
+        fclose(wfp);
+        rename("logs/packets.jsonl.tmp", "logs/packets.jsonl");
+    }
+
+    free(pairs);
+    free(existing_lines);
     appendf(json, JSON_BUF, "{\"ok\":true,\"packets\":");
     append_packet_array(json, JSON_BUF, "logs/packets.jsonl");
     appendf(json, JSON_BUF, ",\"count\":");
@@ -794,7 +869,7 @@ static void truncate_logs(void) {
 static void api_server_start(int fd, const char *body) {
     static char port[32], password[256], input[PATH_MAX], checked_input[PATH_MAX];
     char error[SMALL_BUF];
-    char *args[] = {"./server", port, password, checked_input, NULL};
+    char *args[] = {"./bin/server", port, password, checked_input, NULL};
     int port_num = json_get_int(body, "port", 9000);
     snprintf(port, sizeof(port), "%d", port_num);
     if (json_get_string(body, "password", password, sizeof(password), "secret") != 0 ||
@@ -816,8 +891,8 @@ static void api_server_start(int fd, const char *body) {
 static void api_client_start(int fd, const char *body) {
     static char host[256], port[32], out[PATH_MAX], checked_out[PATH_MAX], pwd1[256], pwd2[256], pwd3[256], mode[32];
     char error[SMALL_BUF];
-    char *args_compat[] = {"./client", host, port, pwd1, pwd2, pwd3, checked_out, NULL};
-    char *args_interactive[] = {"./client", host, port, checked_out, NULL};
+    char *args_compat[] = {"./bin/client", host, port, pwd1, pwd2, pwd3, checked_out, NULL};
+    char *args_interactive[] = {"./bin/client", host, port, checked_out, NULL};
     int port_num = json_get_int(body, "port", 9000);
     snprintf(port, sizeof(port), "%d", port_num);
     json_get_string(body, "host", host, sizeof(host), "127.0.0.1");

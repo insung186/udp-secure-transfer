@@ -1,4 +1,5 @@
 #include "logger.h"
+#include "protocol.h"
 #include "sha1_util.h"
 
 #include <errno.h>
@@ -128,9 +129,13 @@ static void write_pid_field(FILE *fp, int *first, const char *key, pid_t value) 
 }
 
 /* 计算 packet_uid：同一 wire 包在 client/server 两端必须产生相同值。
-   派生规则：SHA1(packet_type + packet_id + wire 前 8 字节) 的前 16 hex 字符。
-   对于 PASS_RESP（密码载荷在日志中被 redact），wire 前 8 字节仍然是协议头
-   + attempt 序号足够稳定；若 attempt 已知则使用 attempt 作降级 key。*/
+   派生规则：
+   - PASS_RESP 哈希完整 wire（header + 整个密码载荷）。原因：前 8 字节对 PASS_RESP
+     来说只覆盖 type+length+密码前 2 字节，两个不同密码如果前 2 字节相同
+     （如 "secret1" / "secret2"）会碰撞。完整 wire 哈希能保证不同密码得到不同 uid。
+   - 其他类型哈希 wire 前 8 字节。type/length 头 6 字节对所有非 PASS_RESP 都足够
+     区分；DATA 类型额外依赖 packet_id 字段（前 4 字节 payload 中前 4 字节是 packet_id）。
+   - 若 wire 不可用（< 8 字节），混入 attempt 作降级 key。*/
 void compute_packet_uid(char *out, size_t out_size, uint16_t packet_type,
                         int packet_id, int attempt, const uint8_t *wire, size_t wire_len) {
     if (out_size < 17) {
@@ -143,14 +148,20 @@ void compute_packet_uid(char *out, size_t out_size, uint16_t packet_type,
     char header[64];
     int header_len = snprintf(header, sizeof(header), "pkt:%u:%d:", (unsigned)packet_type, packet_id);
     sha1_update(&ctx, (const uint8_t *)header, (size_t)header_len);
-    size_t take = wire_len < 8 ? wire_len : 8;
-    if (take > 0 && wire) {
-        sha1_update(&ctx, wire, take);
-    } else if (attempt > 0) {
-        /* 降级：仅靠 packet_type+id 无法稳定时，混入 attempt */
-        char buf[16];
-        int n = snprintf(buf, sizeof(buf), ":a%d", attempt);
-        sha1_update(&ctx, (const uint8_t *)buf, (size_t)n);
+    if (packet_type == PKT_PASS_RESP && wire && wire_len > 0) {
+        /* PASS_RESP：哈希完整 wire（header + 完整密码）。两端都看到相同的 wire 字节，
+           所以 uid 一致；不同密码会得到不同 uid。 */
+        sha1_update(&ctx, wire, wire_len);
+    } else {
+        size_t take = wire_len < 8 ? wire_len : 8;
+        if (take > 0 && wire) {
+            sha1_update(&ctx, wire, take);
+        } else if (attempt > 0) {
+            /* 降级：仅靠 packet_type+id 无法稳定时，混入 attempt */
+            char buf[16];
+            int n = snprintf(buf, sizeof(buf), ":a%d", attempt);
+            sha1_update(&ctx, (const uint8_t *)buf, (size_t)n);
+        }
     }
     sha1_final(&ctx, digest);
     /* 取前 8 字节，输出 16 hex 字符 */

@@ -143,6 +143,10 @@ static int transfer_file(Logger *logger, int sockfd, const struct sockaddr_in *p
     size_t n;
     size_t wire_len;
     uint32_t packet_id = 0;
+    /* total_data_bytes: 已成功发送的 DATA 包 payload 累计字节数；
+       与 SERVER_START.bytes（输入文件总字节数）保持同语义，
+       便于前端 / 终端用户一眼对照"发了多少 / 共有多少"。*/
+    size_t total_data_bytes = 0;
     char sha_hex[SHA1_HEX_LENGTH + 1];
 
     fp = fopen(input_path, "rb");
@@ -168,6 +172,7 @@ static int transfer_file(Logger *logger, int sockfd, const struct sockaddr_in *p
             fclose(fp);
             return -1;
         }
+        total_data_bytes += n;
         packet_id++;
         pause_time.tv_sec = 0;
         pause_time.tv_nsec = 1000000L;
@@ -190,7 +195,10 @@ static int transfer_file(Logger *logger, int sockfd, const struct sockaddr_in *p
     LogEvent e = log_defaults("SUCCESS", "SERVER_DIGEST", "VERIFY", "server SHA1 digest sent");
     e.peer = peer_text;
     e.sha1 = sha_hex;
-    e.bytes = (int)packet_id;
+    /* 发送完成后：bytes = 累计发送的 payload 字节数（与 SERVER_START.bytes 同语义）。
+       若传输中途因 stop_requested 或 send 失败提前返回，bytes 不会更新——这是有意的，
+       表示"未完成"。*/
+    e.bytes = (int)total_data_bytes;
     logger_write(logger, &e);
     return 0;
 }

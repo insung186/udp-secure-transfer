@@ -20,42 +20,42 @@ make
 make clean
 ```
 
-`make` 会生成：
+`make` 会生成在 `bin/` 子目录：
 
-- `./server`
-- `./client`
-- `./control_server`
+- `bin/server`
+- `bin/client`
+- `bin/control_server`
 
 ## 命令行运行方式
 
 服务器保持实验要求格式：
 
 ```bash
-./server <serverport> <password> <inputfile>
+./bin/server <serverport> <password> <inputfile>
 ```
 
 示例：
 
 ```bash
-./server 9000 secret test/input.txt
+./bin/server 9000 secret test/input.txt
 ```
 
 客户端保持实验要求格式：
 
 ```bash
-./client <servername> <serverport> <clientpwd1> <clientpwd2> <clientpwd3> <outputfile>
+./bin/client <servername> <serverport> <clientpwd1> <clientpwd2> <clientpwd3> <outputfile>
 ```
 
 示例：
 
 ```bash
-./client 127.0.0.1 9000 wrong secret ignored output/result.txt
+./bin/client 127.0.0.1 9000 wrong secret ignored output/result.txt
 ```
 
 兼容拓展：Web 前端可使用交互式密码输入，命令行也可直接运行：
 
 ```bash
-./client <servername> <serverport> <outputfile>
+./bin/client <servername> <serverport> <outputfile>
 ```
 
 交互模式不会破坏基础验收格式。
@@ -107,7 +107,7 @@ JOIN_REQ -> PASS_REQ -> PASS_RESP -> PASS_REQ -> PASS_RESP -> PASS_REQ -> PASS_R
 ```bash
 cd udp-secure-transfer
 make
-./control_server
+./bin/control_server
 ```
 
 浏览器打开：
@@ -119,7 +119,7 @@ http://127.0.0.1:8080/
 也可以指定控制服务端口：
 
 ```bash
-./control_server 18080
+./bin/control_server 18080
 ```
 
 控制台采用左侧可折叠控制边栏 + 右侧多 Tab 展示区：

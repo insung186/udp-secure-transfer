@@ -41,7 +41,7 @@ def run_cmd(args, timeout=8):
 
 def start_server(port, password, input_file):
     return subprocess.Popen(
-        ["./server", str(port), password, str(input_file)],
+        ["./bin/server", str(port), password, str(input_file)],
         cwd=ROOT,
         env=ENV,
         text=True,
@@ -112,7 +112,7 @@ def run_pair(case_id, name, input_file, password, attempts, expect_ok=True):
     output.unlink(missing_ok=True)
     server = start_server(port, password, input_file)
     wait_for_server_start(port)
-    client = run_cmd(["./client", "127.0.0.1", str(port), *attempts, str(output)], timeout=8)
+    client = run_cmd(["./bin/client", "127.0.0.1", str(port), *attempts, str(output)], timeout=8)
     server_rc, server_out, server_err = collect_process(server, timeout=8)
     client_ok = "OK" in client.stdout
     server_ok = "OK" in server_out
@@ -139,7 +139,7 @@ def run_pair(case_id, name, input_file, password, attempts, expect_ok=True):
 
 def test_missing_input():
     port = free_udp_port()
-    proc = run_cmd(["./server", str(port), "secret", "test/cases/missing-file.bin"], timeout=3)
+    proc = run_cmd(["./bin/server", str(port), "secret", "test/cases/missing-file.bin"], timeout=3)
     passed = proc.returncode != 0 and "ABORT" in proc.stdout
     return result(
         "missing_input",
@@ -156,7 +156,7 @@ def test_timeout():
     output = ROOT / "output" / "timeout.out"
     output.unlink(missing_ok=True)
     proc = run_cmd(
-        ["./client", "127.0.0.1", str(port), "secret", "secret", "secret", str(output)],
+        ["./bin/client", "127.0.0.1", str(port), "secret", "secret", "secret", str(output)],
         timeout=5,
     )
     passed = proc.returncode != 0 and "ABORT" in proc.stdout
@@ -210,7 +210,7 @@ def test_sequence_error():
     thread = threading.Thread(target=fake_sequence_server, args=(port, "secret"), daemon=True)
     thread.start()
     proc = run_cmd(
-        ["./client", "127.0.0.1", str(port), "secret", "secret", "secret", str(output)],
+        ["./bin/client", "127.0.0.1", str(port), "secret", "secret", "secret", str(output)],
         timeout=6,
     )
     thread.join(timeout=1)
