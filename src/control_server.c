@@ -45,6 +45,7 @@ typedef struct {
     long server_log_offset;
     long client_log_offset;
     long control_log_offset;
+    long packets_log_offset;
     char last_test_result[8192];
 } ControlState;
 
@@ -573,6 +574,171 @@ static void append_log_array(char *json, size_t cap, const char *key, const char
     appendf(json, cap, "]");
 }
 
+/* 写入一条结构化 packet 记录。
+   path: 结构化包存储文件路径（logs/packets.jsonl）
+   不在 backend 做跨 run 去重——同一 packet_uid 可能属于不同 run/flow（不同输入）。
+   跨 run 去重交给前端的 buildRealPackets 处理（key = flow_id + packet_uid）。
+   同一 run 内 client/server 双端记录由前端基于 packet_uid 配对去重。*/
+static int append_packet_record(const char *path, const char *line) {
+    if (!path || !line || line[0] != '{') return -1;
+    FILE *wfp = fopen(path, "a");
+    if (!wfp) return -1;
+    fputs(line, wfp);
+    fputc('\n', wfp);
+    fclose(wfp);
+    return 0;
+}
+
+static void append_packet_array(char *json, size_t cap, const char *path) {
+    FILE *fp = fopen(path, "r");
+    char line[8192];
+    int first = 1;
+    appendf(json, cap, "[");
+    if (fp) {
+        while (fgets(line, sizeof(line), fp)) {
+            size_t len = strlen(line);
+            while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+                line[--len] = '\0';
+            }
+            if (line[0] != '{') {
+                continue;
+            }
+            appendf(json, cap, "%s%s", first ? "" : ",", line);
+            first = 0;
+        }
+        fclose(fp);
+    }
+    appendf(json, cap, "]");
+}
+
+static void truncate_packets(void) {
+    FILE *fp = fopen("logs/packets.jsonl", "w");
+    if (fp) fclose(fp);
+    state.packets_log_offset = 0;
+}
+
+/* 从一行日志中提取 packet_type；若非数据包事件则返回 0 */
+static int is_packet_log_line(const char *line) {
+    if (!line) return 0;
+    /* 至少需要 packet_type 字段且非空 */
+    const char *p = strstr(line, "\"packet_type\":\"");
+    if (!p) return 0;
+    p += 15;
+    return (*p && *p != '"') ? 1 : 0;
+}
+
+/* 从一行日志里提取 packet_uid（若有），用于跨文件 dedup */
+static void line_uid_key(const char *line, char *out, size_t out_size) {
+    out[0] = '\0';
+    if (!line) return;
+    const char *p = strstr(line, "\"packet_uid\":\"");
+    if (p) {
+        p += 14;
+        const char *end = strchr(p, '"');
+        if (end && (size_t)(end - p) < out_size) {
+            size_t n = (size_t)(end - p);
+            memcpy(out, p, n);
+            out[n] = '\0';
+        }
+    }
+}
+
+/* 读取 packets.jsonl 已有 uid 集合（用于跨 run 去重） */
+static char **load_existing_uids(const char *path, size_t *out_n) {
+    *out_n = 0;
+    FILE *fp = fopen(path, "r");
+    if (!fp) return NULL;
+    char **arr = NULL;
+    size_t cap = 0;
+    char line[2048];
+    while (fgets(line, sizeof(line), fp)) {
+        char uid[64];
+        line_uid_key(line, uid, sizeof(uid));
+        if (!uid[0]) continue;
+        if (*out_n >= cap) {
+            cap = cap ? cap * 2 : 64;
+            arr = realloc(arr, cap * sizeof(char *));
+        }
+        if (arr) {
+            arr[*out_n] = strdup(uid);
+            (*out_n)++;
+        }
+    }
+    fclose(fp);
+    return arr;
+}
+
+static int uid_in_set(char **set, size_t n, const char *uid) {
+    if (!uid || !uid[0]) return 0;
+    for (size_t i = 0; i < n; i++) {
+        if (set[i] && strcmp(set[i], uid) == 0) return 1;
+    }
+    return 0;
+}
+
+static void free_uid_set(char **set, size_t n) {
+    if (!set) return;
+    for (size_t i = 0; i < n; i++) free(set[i]);
+    free(set);
+}
+
+static void api_packets(int fd) {
+    char *json = calloc(1, JSON_BUF);
+    if (!json) {
+        send_http(fd, "500 Internal Server Error", "application/json", "{\"error\":\"oom\"}");
+        return;
+    }
+    /* 增量追加：每次请求都扫描 server/client log，将尚未记录在 packets.jsonl 中的
+       packet 行追加进去；这样多次 run 都能累积，reset 后会自动重新建立。 */
+    size_t existing_n = 0;
+    char **existing = load_existing_uids("logs/packets.jsonl", &existing_n);
+    const char *log_paths[] = {"logs/server.jsonl", "logs/client.jsonl"};
+    for (size_t i = 0; i < sizeof(log_paths) / sizeof(log_paths[0]); i++) {
+        FILE *lfp = fopen(log_paths[i], "r");
+        if (!lfp) continue;
+        char line[8192];
+        while (fgets(line, sizeof(line), lfp)) {
+            if (!is_packet_log_line(line)) continue;
+            char uid[64];
+            line_uid_key(line, uid, sizeof(uid));
+            if (uid[0] && !uid_in_set(existing, existing_n, uid)) {
+                size_t len = strlen(line);
+                while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+                    line[--len] = '\0';
+                }
+                append_packet_record("logs/packets.jsonl", line);
+                /* 维护内存中的 uid 集合，避免同一次请求内重复 */
+                if (existing_n % 64 == 0) {
+                    char **new_arr = realloc(existing, (existing_n + 64) * sizeof(char *));
+                    if (new_arr) existing = new_arr;
+                }
+                if (existing) {
+                    existing[existing_n] = strdup(uid);
+                    existing_n++;
+                }
+            }
+        }
+        fclose(lfp);
+    }
+    free_uid_set(existing, existing_n);
+    appendf(json, JSON_BUF, "{\"ok\":true,\"packets\":");
+    append_packet_array(json, JSON_BUF, "logs/packets.jsonl");
+    appendf(json, JSON_BUF, ",\"count\":");
+    int count = 0;
+    FILE *cfp = fopen("logs/packets.jsonl", "r");
+    if (cfp) {
+        char buf[512];
+        while (fgets(buf, sizeof(buf), cfp)) {
+            if (buf[0] == '{') count++;
+        }
+        fclose(cfp);
+    }
+    appendf(json, JSON_BUF, "%d", count);
+    appendf(json, JSON_BUF, "}");
+    send_http(fd, "200 OK", "application/json; charset=utf-8", json);
+    free(json);
+}
+
 static void api_logs(int fd) {
     char *json = calloc(1, JSON_BUF);
     if (!json) {
@@ -616,9 +782,13 @@ static void truncate_logs(void) {
     if (fp) fclose(fp);
     fp = fopen("logs/control.jsonl", "w");
     if (fp) fclose(fp);
+    /* 同时清空结构化包记录 */
+    fp = fopen("logs/packets.jsonl", "w");
+    if (fp) fclose(fp);
     state.server_log_offset = 0;
     state.client_log_offset = 0;
     state.control_log_offset = 0;
+    state.packets_log_offset = 0;
 }
 
 static void api_server_start(int fd, const char *body) {
@@ -737,8 +907,10 @@ static void route_api(int fd, const char *method, const char *path, const char *
         api_status(fd);
     } else if (strcmp(path, "/api/logs") == 0 && strcmp(method, "GET") == 0) {
         api_logs(fd);
-    } else if (strcmp(path, "/api/logs/clear") == 0 && strcmp(method, "POST") == 0) {
-        truncate_logs();
+    } else if (strcmp(path, "/api/packets") == 0 && strcmp(method, "GET") == 0) {
+        api_packets(fd);
+    } else if (strcmp(path, "/api/packets/clear") == 0 && strcmp(method, "POST") == 0) {
+        truncate_packets();
         send_http(fd, "200 OK", "application/json", "{\"ok\":true}");
     } else if (strcmp(path, "/api/server/start") == 0 && strcmp(method, "POST") == 0) {
         api_server_start(fd, body);
@@ -757,6 +929,8 @@ static void route_api(int fd, const char *method, const char *path, const char *
         stop_child(&state.client);
         child_init(&state.server, "server");
         child_init(&state.client, "client");
+        /* 重置时同时清空所有日志文件（保留日志目录） */
+        truncate_logs();
         send_http(fd, "200 OK", "application/json", "{\"ok\":true}");
     } else if (strcmp(path, "/api/test/list") == 0) {
         send_http(fd, "200 OK", "application/json",

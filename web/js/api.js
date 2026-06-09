@@ -25,7 +25,7 @@
   window.Api = {
     status: () => request("/api/status"),
     logs: () => request("/api/logs"),
-    clearLogs: () => request("/api/logs/clear", {method: "POST"}),
+    packets: () => request("/api/packets"),
     reset: () => request("/api/reset", {method: "POST"}),
     startServer: (body) => request("/api/server/start", {method: "POST", body}),
     stopServer: () => request("/api/server/stop", {method: "POST"}),

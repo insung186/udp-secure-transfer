@@ -137,84 +137,33 @@
     document.documentElement.dataset.theme = target;
     ensureDecorLayer();
     applyDecorBackgrounds(target);
-    // 同步原生 select（保留以兼容旧 UI）
+    // 同步原生 select
     const select = document.getElementById('theme-select');
     if (select && select.value !== target) select.value = target;
-    // 同步主题卡片高亮
-    syncThemeCards(target);
     if (!options || options.persist !== false) persist(target);
     return target;
   }
 
-  function syncThemeCards(activeId) {
-    const cards = document.querySelectorAll('[data-theme-card]');
-    cards.forEach((card) => {
-      card.classList.toggle('is-active', card.dataset.themeCard === activeId);
-      card.setAttribute('aria-pressed', card.dataset.themeCard === activeId ? 'true' : 'false');
-    });
-  }
-
-  // 渲染主题选择卡片网格
-  function renderThemePicker(container, language) {
-    if (!container) return;
-    container.innerHTML = '';
-    const active = document.documentElement.dataset.theme || DEFAULT_THEME;
-    THEMES.forEach((theme) => {
-      const card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'theme-card';
-      card.dataset.themeCard = theme.id;
-      card.setAttribute('aria-pressed', theme.id === active ? 'true' : 'false');
-      if (theme.id === active) card.classList.add('is-active');
-      card.innerHTML = [
-        '<span class="swatches">',
-        theme.swatches
-          .map((c) => '<span style="background:' + c + '"></span>')
-          .join(''),
-        '</span>',
-        '<span class="name">' + (language === 'en' ? theme.name : theme.nameZh) + '</span>',
-        '<span class="desc">' + theme.desc + '</span>',
-      ].join('');
-      card.addEventListener('click', () => {
-        setTheme(theme.id);
-        // 触发一次 render()（如果 app.js 已挂载）
-        if (typeof window.render === 'function') {
-          try { window.render(); } catch (e) { /* noop */ }
-        }
-      });
-      container.appendChild(card);
-    });
-  }
-
-  // 提供给 app.js 使用的：刷新主题卡片的语言
-  function refreshThemePickerLabels(language) {
-    const container = document.getElementById('theme-picker');
-    if (!container) return;
-    const cards = container.querySelectorAll('[data-theme-card]');
-    cards.forEach((card) => {
-      const id = card.dataset.themeCard;
-      const theme = THEMES.find((t) => t.id === id);
-      if (!theme) return;
-      const nameEl = card.querySelector('.name');
-      const descEl = card.querySelector('.desc');
-      if (nameEl) nameEl.textContent = language === 'en' ? theme.name : theme.nameZh;
-      if (descEl) descEl.textContent = theme.desc;
-    });
-  }
-
-  // 兼容旧的 #theme-select 控件：只负责填选项，change 事件由 app.js 的 wireEvents 统一注册
-  function bindLegacySelect() {
+  // 填充主题下拉框：仅保留短名称（中文显示 nameZh，英文显示 name）
+  function fillThemeSelect() {
     const select = document.getElementById('theme-select');
     if (!select) return;
     const current = document.documentElement.dataset.theme || DEFAULT_THEME;
+    const isEn = document.documentElement.lang === 'en';
     select.innerHTML = '';
     THEMES.forEach((theme) => {
       const opt = document.createElement('option');
       opt.value = theme.id;
-      opt.textContent = (document.documentElement.lang === 'en' ? theme.name : theme.nameZh) + ' · ' + theme.desc;
+      // 下拉框只保留短名称
+      opt.textContent = isEn ? theme.name : theme.nameZh;
       if (theme.id === current) opt.selected = true;
       select.appendChild(opt);
     });
+  }
+
+  // 刷新下拉框文字（语言切换时）
+  function refreshThemeSelectLabels() {
+    fillThemeSelect();
   }
 
   // 暴露到全局
@@ -228,9 +177,8 @@
       setTheme(saved, { persist: false });
       ensureDecorLayer();
       applyDecorBackgrounds(saved);
-      bindLegacySelect();
+      fillThemeSelect();
     },
-    renderPicker: renderThemePicker,
-    refreshLabels: refreshThemePickerLabels,
+    refreshLabels: refreshThemeSelectLabels,
   };
 })();

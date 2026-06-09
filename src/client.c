@@ -48,14 +48,22 @@ static void finish(Logger *logger, const char *result, const char *reason) {
 
 static void log_packet(Logger *logger, const char *level, const char *event,
                        const char *state, const char *peer, const uint8_t *wire,
-                       size_t wire_len, const Packet *packet) {
+                       size_t wire_len, const Packet *packet, const char *direction,
+                       int attempt) {
     char hex[PROTOCOL_RECV_BUFFER * 2 + 1];
+    char uid[24];
     LogEvent e = log_defaults(level, event, state, "packet event");
     size_t hex_len = wire_len > 160 ? 160 : wire_len;
     bytes_to_hex(wire, hex_len, hex, sizeof(hex));
     e.peer = peer;
     e.packet_type = packet_type_name(packet->type);
+    e.packet_code = (int)packet->type;
     e.payload_length = (int)packet->payload_length;
+    e.direction = direction;
+    compute_packet_uid(uid, sizeof(uid), packet->type,
+                       packet->type == PKT_DATA ? (int)packet->packet_id : 0,
+                       attempt, wire, wire_len);
+    e.packet_uid = uid[0] ? uid : NULL;
     if (packet->type != PKT_PASS_RESP) {
         e.wire_hex = hex;
         if (hex_len < wire_len) {
@@ -83,14 +91,17 @@ static int send_logged(Logger *logger, int sockfd, const struct sockaddr_in *pee
         LogEvent e = log_defaults("ERROR", "SEND_ERROR", state, strerror(errno));
         e.peer = peer_text;
         e.packet_type = packet_type_name(type);
+        e.packet_code = (int)type;
+        e.direction = "Client -> Server";
         logger_write(logger, &e);
         return -1;
     }
-    log_packet(logger, "INFO", event, state, peer_text, wire, wire_len, &packet);
+    log_packet(logger, "INFO", event, state, peer_text, wire, wire_len, &packet, "Client -> Server", attempt);
     if (attempt != LOG_INT_UNSET) {
         LogEvent e = log_defaults("AUTH", "AUTH_ATTEMPT_SENT", state, "password attempt sent");
         e.peer = peer_text;
         e.attempt = attempt;
+        e.direction = "Client -> Server";
         logger_write(logger, &e);
     }
     return 0;
@@ -105,12 +116,13 @@ static int recv_logged(Logger *logger, int sockfd, Packet *packet,
                                   strcmp(error, "timeout") == 0 ? "TIMEOUT" : "PARSE_ERROR",
                                   state, error);
         e.error_code = error;
+        e.direction = "Server -> Client";
         logger_write(logger, &e);
         return -1;
     }
     peer_to_string(peer, peer_text, peer_text_size);
     log_packet(logger, packet->type == PKT_DATA ? "DATA" : "INFO", event, state,
-               peer_text, packet->wire, packet->wire_length, packet);
+               peer_text, packet->wire, packet->wire_length, packet, "Server -> Client", 0);
     return 0;
 }
 

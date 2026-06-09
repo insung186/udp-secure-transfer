@@ -1,6 +1,11 @@
 const appState = {
   status: {},
   logs: [],
+  /* allPackets: 所有 flow 中的所有包（包列表原始数据，含双端日志记录） */
+  allPackets: [],
+  /* realPackets: 基于 packet_uid 去重后的真实包（包列表主视图） */
+  realPackets: [],
+  /* packets: 当前 flow 的包（旧字段名保留，供 deriveRun 等使用） */
   packets: [],
   selectedPacket: null,
   tests: [],
@@ -13,7 +18,13 @@ const appState = {
   clientRunStartedAt: 0,
   clientRunLogIndex: 0,
   interactiveClientActive: false,
+  interactiveLastOutcome: null, // 记录上一次交互式客户端的结局：null / "manual_stop" / "auto_end"
+  interactiveWaiting: false, // 仅在真正等待用户输入密码时为 true
   selectedFlowId: null,
+  currentFlowId: null,       // 最近一次 flow（最近一次 server/client/sim 启动）
+  lastFlowResult: null,      // 最近一次 flow 的结果：OK / ABORT / null
+  lastFlowPhase: "INIT",     // 最近一次 flow 的阶段
+  flowCounter: 0,            // 全局递增 ID
   sequenceExpandedFlows: new Set(),
   packetFilters: {
     query: "",
@@ -68,7 +79,6 @@ const i18n = {
     experimentControl: "实验控制",
     runHint: "运行",
     resetRun: "重置实验",
-    clearLogs: "清空日志",
     appearance: "界面设置",
     appearanceHint: "显示",
     language: "界面语言",
@@ -120,6 +130,15 @@ const i18n = {
     allLevels: "全部级别",
     errorsOnly: "只看异常",
     realtimeLogs: "实时日志",
+    level: "级别",
+    event: "事件",
+    message: "消息",
+    logSource: "日志来源",
+    pairedLogsTitle: "对端日志记录（调试信息）",
+    packetFieldsTitle: "字段解析",
+    pairedSenderLog: "发送端记录",
+    pairedReceiverLog: "接收端记录",
+    pairedOtherLog: "对端记录",
     testsAndSim: "测试与异常模拟",
     scriptResults: "自动脚本结果",
     runTests: "运行测试",
@@ -151,9 +170,23 @@ const i18n = {
     passwordAttemptHint: "请先启动交互式客户端",
     passwordAttemptReady: "等待输入密码",
     interactiveClientIdle: "客户端未启动",
-    interactiveStartHint: "请先启动客户端",
+    interactiveStartHint: "请先启动交互式客户端",
+    authSucceeded: "认证成功，共尝试 {attempts} 次",
+    authFailed: "认证失败，共尝试 {attempts} 次",
+    authTimedOut: "连接超时，共尝试 {attempts} 次",
+    authErrored: "运行异常，共尝试 {attempts} 次",
+    clientStopped: "客户端已停止，共尝试 {attempts} 次",
+    clientRunningStopped: "客户端已停止，共尝试 {attempts} 次",
+    transferCompleted: "传输完成，认证共尝试 {attempts} 次",
+    passwordAttemptWaiting: "第 {current} / 3 次密码尝试，等待输入密码",
+    clientIdle: "客户端空闲",
+    clientRunning: "客户端运行中",
+    interactiveLastStopped: "上一轮已停止",
+    interactiveLastEnded: "上一轮已结束",
     passwordAttemptComplete: "认证已完成，共尝试 {attempts} 次",
     passwordAttemptFailed: "认证已结束，共尝试 {attempts} 次",
+    authSuccessHint: "认证已通过，等待数据开始传输",
+    authFailedHint: "本轮认证已结束，请点击“启动客户端”开始新一轮",
     dashboardIntro: "启动服务端和客户端后，这里会展示认证、传输和校验结果。",
     dashboardSummary: "认证尝试 {attempts}/3，已接收 {bytes}。",
     phaseDone: "完成",
@@ -251,7 +284,6 @@ const i18n = {
     experimentControl: "Experiment control",
     runHint: "Run",
     resetRun: "Reset run",
-    clearLogs: "Clear logs",
     appearance: "Appearance",
     appearanceHint: "Display",
     language: "Language",
@@ -303,6 +335,15 @@ const i18n = {
     allLevels: "All levels",
     errorsOnly: "Errors only",
     realtimeLogs: "Live logs",
+    level: "Level",
+    event: "Event",
+    message: "Message",
+    logSource: "Log source",
+    pairedLogsTitle: "Peer-side log records (debug)",
+    packetFieldsTitle: "Field parsing",
+    pairedSenderLog: "Sender record",
+    pairedReceiverLog: "Receiver record",
+    pairedOtherLog: "Peer record",
     testsAndSim: "Tests & failure simulation",
     scriptResults: "Automated script results",
     runTests: "Run tests",
@@ -334,9 +375,23 @@ const i18n = {
     passwordAttemptHint: "Start the interactive client first",
     passwordAttemptReady: "Waiting for password input",
     interactiveClientIdle: "Client not started",
-    interactiveStartHint: "Start the client first",
+    interactiveStartHint: "Start the interactive client first",
+    authSucceeded: "Authenticated after {attempts} attempt(s)",
+    authFailed: "Authentication failed after {attempts} attempt(s)",
+    authTimedOut: "Connection timed out after {attempts} attempt(s)",
+    authErrored: "Run errored after {attempts} attempt(s)",
+    clientStopped: "Client stopped after {attempts} attempt(s)",
+    clientRunningStopped: "Client stopped after {attempts} attempt(s)",
+    transferCompleted: "Transfer complete, auth used {attempts} attempt(s)",
+    passwordAttemptWaiting: "Password attempt {current} / 3, waiting for input",
+    clientIdle: "Client idle",
+    clientRunning: "Client running",
+    interactiveLastStopped: "Last run was stopped",
+    interactiveLastEnded: "Last run has ended",
     passwordAttemptComplete: "Authenticated after {attempts} attempt(s)",
     passwordAttemptFailed: "Authentication ended after {attempts} attempt(s)",
+    authSuccessHint: "Authenticated, waiting for data transfer",
+    authFailedHint: "This authentication round is over. Start a new client to try again.",
     dashboardIntro: "Start the server and client to inspect authentication, transfer, and verification results.",
     dashboardSummary: "Auth attempts {attempts}/3, received {bytes}.",
     phaseDone: "Done",
@@ -466,8 +521,14 @@ function resetInteractiveAttemptState() {
 function resetFrontendRunState({clearFilters = false} = {}) {
   appState.logs = [];
   appState.packets = [];
+  appState.allPackets = [];
+  appState.realPackets = [];
   appState.selectedPacket = null;
+  appState.interactiveLastOutcome = null;
   appState.selectedFlowId = null;
+  appState.currentFlowId = null;
+  appState.lastFlowResult = null;
+  appState.lastFlowPhase = "INIT";
   appState.tests = [];
   appState.testMode = "idle";
   appState.sequenceExpandedFlows.clear();
@@ -583,49 +644,131 @@ function peerPort(peer) {
   return match ? match[1] : "";
 }
 
+// 生成新的 Flow ID：每次 server/client/test 启动都生成一个独立 flow
+// 一次传输尝试 = 一次 flow；成功 / 失败 / 超时 / 认证失败都共享同一个 flow
+function generateFlowId(prefix = "flow", entry) {
+  appState.flowCounter += 1;
+  const port = (entry && (entry.port || peerPort(entry.peer))) || (appState.status.server?.port || appState.status.client?.port) || "udp";
+  return `${prefix}-${appState.flowCounter.toString().padStart(4, "0")}-${port}`;
+}
+
+// 用户主动启动 server 时调用：
+//   不在此处预生成 flow_id，避免与 ensureFlowIds 中的实际 stamp 冲突。
+//   真正的 flow_id 由 ensureFlowIds 在收到 SERVER_START 日志时确定（单一来源），
+//   并同步到 appState.currentFlowId。
+//   同时清空 selectedFlowId，使新 run 默认成为"最近一次流"，不会沿用用户上一次点击的旧流。
+function beginServerFlow() {
+  appState.currentFlowId = null;
+  appState.selectedFlowId = null;
+  appState.lastFlowResult = null;
+  appState.lastFlowPhase = "INIT";
+  return null;
+}
+
+// 用户主动启动 client 时调用 -> 等 SERVER_START 的 flow_id 被收到
+function beginClientFlow() {
+  appState.currentFlowId = null;
+  appState.selectedFlowId = null;
+  appState.lastFlowResult = null;
+  appState.lastFlowPhase = "INIT";
+  return null;
+}
+
+// 测试/模拟开始时调用 -> 等第一次 SERVER_START / CLIENT_START 决定 flow_id
+function beginSimulationFlow() {
+  appState.currentFlowId = null;
+  appState.selectedFlowId = null;
+  appState.lastFlowResult = null;
+  appState.lastFlowPhase = "INIT";
+  return null;
+}
+
 function ensureFlowIds() {
+  // 一次传输尝试 = 一次 flow：服务端启动 + 客户端在该端口的尝试 = 同一个 flow
+  // 每个 SERVER_START 创建新 server flow；CLIENT_START 复用同端口的 server flow（若存在）
+  // 这样 sequence / dashboard 能完整看到双向包；新一次客户端尝试自动开新 flow
   const serverFlowsByPort = new Map();
-  const activeFlowByRole = new Map();
-  let flowCounter = 0;
-  const createFlowId = (prefix, entry) => {
-    flowCounter += 1;
-    const port = entry.port || peerPort(entry.peer) || "udp";
-    return `${prefix}-${flowCounter}-${port}`;
-  };
+  let activeServerFlow = null;
+  let lastEventFinal = null;
 
   appState.logs.forEach((entry) => {
-    if (entry.flow_id || entry.session_id) {
-      const id = entry.flow_id || entry.session_id;
-      entry.flow_id = id;
-      entry.session_id = id;
-      if (entry.role) activeFlowByRole.set(entry.role, id);
-      if (entry.port) serverFlowsByPort.set(String(entry.port), id);
+    if (entry.flow_id && /^flow-\d{4}-/.test(entry.flow_id)) {
+      const port = String(entry.port || peerPort(entry.peer) || "");
+      if (entry.role === "server" && entry.event === "SERVER_START" && port) {
+        serverFlowsByPort.set(port, entry.flow_id);
+        activeServerFlow = entry.flow_id;
+      }
+      if (entry.event === "FINAL_OK" || entry.event === "FINAL_ABORT") {
+        lastEventFinal = entry;
+      }
       return;
     }
 
-    let flowId = "";
+    let flowId = null;
+    const port = String(entry.port || peerPort(entry.peer) || "");
+
     if (entry.role === "server" && entry.event === "SERVER_START") {
-      flowId = createFlowId("flow", entry);
-      if (entry.port) serverFlowsByPort.set(String(entry.port), flowId);
-      activeFlowByRole.set("server", flowId);
+      flowId = generateFlowId("flow", entry);
+      if (port) serverFlowsByPort.set(port, flowId);
+      activeServerFlow = flowId;
     } else if (entry.role === "client" && entry.event === "CLIENT_START") {
-      const port = String(entry.port || peerPort(entry.peer) || "");
-      flowId = serverFlowsByPort.get(port) || createFlowId("client-flow", entry);
-      activeFlowByRole.set("client", flowId);
-    } else if (entry.role === "server") {
-      flowId = activeFlowByRole.get("server") || createFlowId("server-flow", entry);
-      activeFlowByRole.set("server", flowId);
+      if (port && serverFlowsByPort.has(port)) {
+        flowId = serverFlowsByPort.get(port);
+      } else {
+        flowId = generateFlowId("flow", entry);
+      }
+    } else if (entry.role === "server" && activeServerFlow) {
+      flowId = activeServerFlow;
     } else if (entry.role === "client") {
-      const port = String(entry.port || peerPort(entry.peer) || "");
-      flowId = activeFlowByRole.get("client") || serverFlowsByPort.get(port) || createFlowId("client-flow", entry);
-      activeFlowByRole.set("client", flowId);
+      // 客户端后续日志：找最近同端口的 client flow
+      const recent = findLatestClientFlowForPort(port);
+      if (recent) flowId = recent;
     }
 
     if (flowId) {
       entry.flow_id = flowId;
       entry.session_id = flowId;
     }
+    if (entry.event === "FINAL_OK" || entry.event === "FINAL_ABORT") {
+      lastEventFinal = entry;
+    }
   });
+
+  // currentFlowId：取最近一个被 stamp 的 flow
+  let mostRecent = null;
+  for (let i = appState.logs.length - 1; i >= 0; i -= 1) {
+    if (appState.logs[i].flow_id) {
+      mostRecent = appState.logs[i].flow_id;
+      break;
+    }
+  }
+  // 仅有当用户没有显式选中某个 flow 时，才自动跟随最新 flow。
+  // 用户在包列表点击某个包后 selectedFlowId 会被设置，协议时序应锁定到该 flow，
+  // 不会因为后续日志到达而跳回"最近一次流"。
+  if (mostRecent && !appState.selectedFlowId && mostRecent !== appState.currentFlowId) {
+    appState.currentFlowId = mostRecent;
+  } else if (mostRecent && appState.selectedFlowId && mostRecent !== appState.selectedFlowId) {
+    // 用户选中的 flow 仍以 selectedFlowId 为准；仅同步 currentFlowId 给派生计算用
+    appState.currentFlowId = appState.selectedFlowId;
+  }
+
+  // 同步 lastFlowResult
+  if (lastEventFinal && lastEventFinal.flow_id === appState.currentFlowId) {
+    appState.lastFlowResult = lastEventFinal.result || (lastEventFinal.event === "FINAL_OK" ? "OK" : "ABORT");
+  }
+}
+
+function findLatestClientFlowForPort(port) {
+  const wantPort = String(port || "");
+  if (!wantPort) return null;
+  for (let i = appState.logs.length - 1; i >= 0; i -= 1) {
+    const e = appState.logs[i];
+    if (e.role === "client" && e.event === "CLIENT_START" && e.flow_id) {
+      const ePort = String(e.port || peerPort(e.peer) || "");
+      if (ePort === wantPort) return e.flow_id;
+    }
+  }
+  return null;
 }
 
 function mergeLogs(entries) {
@@ -640,11 +783,45 @@ function mergeLogs(entries) {
   appState.logs.sort((a, b) => String(a.time).localeCompare(String(b.time)));
   appState.logs = appState.logs.slice(-1200);
   ensureFlowIds();
-  appState.packets = appState.logs.filter((entry) => entry.packet_type);
+  // allPackets: 所有 flow 的包（包列表使用，不过滤 currentFlowId）
+  appState.allPackets = appState.logs.filter((entry) => entry.packet_type);
+  // realPackets: 基于后端 packet_uid 去重后的真实包；同一 wire 包仅出现一次
+  appState.realPackets = buildRealPackets(appState.allPackets);
+  // packets: 保留兼容旧引用；按 currentFlowId 过滤
+  appState.packets = appState.currentFlowId
+    ? appState.allPackets.filter((entry) => entry.flow_id === appState.currentFlowId)
+    : appState.allPackets;
   if (appState.selectedFlowId && !appState.packets.some((entry) => entry.flow_id === appState.selectedFlowId)) {
     appState.selectedFlowId = null;
     appState.selectedPacket = null;
   }
+}
+
+/**
+ * 基于后端 packet_uid 字段对包去重；同 wire 包在 client/server 两端产生相同 uid。
+ * - 关键：去重 key 必须包含 flow_id；不同 run 相同输入会得到相同 packet_uid，
+ *   若忽略 flow_id 就会把跨 run 的包错合并掉。
+ * - 降级（无 packet_uid 的旧日志）：按 (flow_id, packet_type, packet_id, time_window)
+ *   - 同一组内保留最早一条（通常是 SEND 端），并把其它端作为 `paired_logs` 备用
+ */
+function buildRealPackets(allPackets) {
+  const groups = new Map();
+  for (const entry of allPackets) {
+    if (!entry.packet_type) continue;
+    const flowId = entry.flow_id || "unknown";
+    let key = entry.packet_uid
+      ? `${flowId}|${entry.packet_uid}`
+      : `${flowId}|${entry.packet_type}|${entry.packet_id ?? ""}|${Math.floor(logTimeMs(entry) / 1500)}`;
+    if (!groups.has(key)) {
+      groups.set(key, { canonical: entry, paired: [] });
+    } else {
+      groups.get(key).paired.push(entry);
+    }
+  }
+  return Array.from(groups.values()).map((g) => {
+    g.canonical.paired_logs = g.paired;
+    return g.canonical;
+  });
 }
 
 function latest(predicate) {
@@ -655,26 +832,50 @@ function latest(predicate) {
 }
 
 function deriveRun() {
-  const finalEvent = latest((entry) => entry.event === "FINAL_OK" || entry.event === "FINAL_ABORT");
-  const result = finalEvent?.result || "Pending";
-  const hasAbort = result === "ABORT" || appState.logs.some((entry) => entry.level === "ERROR" || entry.level === "ABORT");
+  // 只统计最近一次 flow 的日志
+  const flowId = appState.currentFlowId;
+  const flowLogs = flowId
+    ? appState.logs.filter((entry) => entry.flow_id === flowId)
+    : appState.logs;
+  const flowPackets = flowId
+    ? appState.packets.filter((entry) => entry.flow_id === flowId)
+    : appState.packets;
+
+  const inFlow = (entry) => !flowId || entry.flow_id === flowId;
+  const flowLatest = (predicate) => {
+    for (let i = flowLogs.length - 1; i >= 0; i -= 1) {
+      if (predicate(flowLogs[i])) return flowLogs[i];
+    }
+    return null;
+  };
+
+  const finalEvent = flowLatest((entry) => entry.event === "FINAL_OK" || entry.event === "FINAL_ABORT");
+  let result = finalEvent?.result || "Pending";
+  // 当最近一次 flow 已经走到 FINAL_OK/FINAL_ABORT，重置时如果 appState 被清空，应当显示初始态
+  if (!flowId) result = "Pending";
+  // 同步到 lastFlowResult，供控制台运行状态使用
+  if (finalEvent && finalEvent.flow_id === flowId) {
+    appState.lastFlowResult = finalEvent.result || (finalEvent.event === "FINAL_OK" ? "OK" : "ABORT");
+  }
+  const hasAbort = result === "ABORT" || flowLogs.some((entry) => entry.level === "ERROR" || entry.level === "ABORT");
   let phase = "INIT";
   if (hasAbort && result === "ABORT") phase = "ABORT";
-  else if (latest((entry) => entry.event === "DIGEST_MATCH")) phase = "DONE";
-  else if (latest((entry) => entry.packet_type === "TERMINATE")) phase = "VERIFY";
-  else if (latest((entry) => entry.packet_type === "DATA")) phase = "DATA_TRANSFER";
-  else if (latest((entry) => ["PASS_REQ", "PASS_RESP", "PASS_ACCEPT", "REJECT"].includes(entry.packet_type))) phase = "AUTH";
-  else if (latest((entry) => entry.packet_type === "JOIN_REQ")) phase = "JOIN";
+  else if (flowLatest((entry) => entry.event === "DIGEST_MATCH")) phase = "DONE";
+  else if (flowLatest((entry) => entry.packet_type === "TERMINATE")) phase = "VERIFY";
+  else if (flowLatest((entry) => entry.packet_type === "DATA")) phase = "DATA_TRANSFER";
+  else if (flowLatest((entry) => ["PASS_REQ", "PASS_RESP", "PASS_ACCEPT", "REJECT"].includes(entry.packet_type))) phase = "AUTH";
+  else if (flowLatest((entry) => entry.packet_type === "JOIN_REQ")) phase = "JOIN";
+  appState.lastFlowPhase = phase;
 
-  const serverDigest = latest((entry) => entry.event === "SERVER_DIGEST" && entry.sha1);
-  const clientDigest = latest((entry) => (entry.event === "DIGEST_MATCH" || entry.event === "DIGEST_MISMATCH") && entry.sha1);
-  const dataRecv = appState.logs.filter((entry) => entry.role === "client" && entry.packet_type === "DATA");
-  const dataSent = appState.logs.filter((entry) => entry.role === "server" && entry.packet_type === "DATA");
-  const inputStart = latest((entry) => entry.event === "SERVER_START");
+  const serverDigest = flowLatest((entry) => entry.event === "SERVER_DIGEST" && entry.sha1);
+  const clientDigest = flowLatest((entry) => (entry.event === "DIGEST_MATCH" || entry.event === "DIGEST_MISMATCH") && entry.sha1);
+  const dataRecv = flowPackets.filter((entry) => entry.role === "client" && entry.packet_type === "DATA");
+  const dataSent = flowPackets.filter((entry) => entry.role === "server" && entry.packet_type === "DATA");
+  const inputStart = flowLatest((entry) => entry.event === "SERVER_START");
   const receivedBytes = dataRecv.reduce((sum, entry) => sum + Number(entry.bytes || entry.payload_length || 0), 0);
   const sentBytes = dataSent.reduce((sum, entry) => sum + Number(entry.bytes || entry.payload_length || 0), 0);
   const totalBytes = Number(inputStart?.bytes || Math.max(receivedBytes, sentBytes, 0));
-  const attempts = Math.max(0, ...appState.logs.map((entry) => Number(entry.attempt || 0)));
+  const attempts = Math.max(0, ...flowLogs.map((entry) => Number(entry.attempt || 0)));
   const progress = totalBytes > 0 ? Math.min(100, Math.round((receivedBytes / totalBytes) * 100)) : result === "OK" ? 100 : 0;
   const firstData = dataRecv[0];
   const lastData = dataRecv[dataRecv.length - 1];
@@ -701,15 +902,23 @@ function deriveRun() {
     progress,
     throughput,
     finalEvent,
+    flowId,
   };
 }
 
 function packetDirection(entry) {
-  const event = entry.event || "";
-  if (entry.role === "client" && event.startsWith("SEND")) return "Client -> Server";
-  if (entry.role === "server" && event.startsWith("RECV")) return "Client -> Server";
-  if (entry.role === "server" && event.startsWith("SEND")) return "Server -> Client";
-  if (entry.role === "client" && event.startsWith("RECV")) return "Server -> Client";
+  // 优先用后端直接给出的 direction 字段（权威值）
+  const direct = entry && entry.direction;
+  if (direct === "Client -> Server" || direct === "Server -> Client" || direct === "Observed") {
+    return direct;
+  }
+  // 回退：基于 role+event 推断（兼容旧日志）
+  const event = (entry && entry.event) || "";
+  const role = entry && entry.role;
+  if (role === "client" && event.startsWith("SEND")) return "Client -> Server";
+  if (role === "server" && event.startsWith("RECV")) return "Client -> Server";
+  if (role === "server" && event.startsWith("SEND")) return "Server -> Client";
+  if (role === "client" && event.startsWith("RECV")) return "Server -> Client";
   return "Observed";
 }
 
@@ -792,10 +1001,12 @@ function sameProtocolMessage(a, b) {
 function sequenceHighlightEntry(flowId) {
   const selected = appState.selectedPacket;
   if (!selected || selected.flow_id !== flowId) return null;
-  if (isSendPacket(selected)) return selected;
+  // 现在时序中包含所有 packet 事件；只要选中包在时序里就直接返回
+  const flowPackets = packetsForFlow(flowId);
+  if (flowPackets.includes(selected)) return selected;
+  // 否则按 message 匹配最近的等价包
   const selectedTime = logTimeMs(selected);
-  const candidates = packetsForFlow(flowId)
-    .filter(isSendPacket)
+  const candidates = flowPackets
     .filter((entry) => sameProtocolMessage(entry, selected))
     .sort((a, b) => Math.abs(logTimeMs(a) - selectedTime) - Math.abs(logTimeMs(b) - selectedTime));
   return candidates[0] || selected;
@@ -819,28 +1030,57 @@ function isSendPacket(entry) {
 }
 
 function latestFlowId() {
-  for (let i = appState.packets.length - 1; i >= 0; i -= 1) {
-    if (appState.packets[i].flow_id) return appState.packets[i].flow_id;
+  // 优先看 allPackets（跨 flow），保证能拿到最近的 flow
+  const source = appState.allPackets.length ? appState.allPackets : appState.packets;
+  for (let i = source.length - 1; i >= 0; i -= 1) {
+    if (source[i].flow_id) return source[i].flow_id;
   }
   return null;
 }
 
 function currentSequenceFlowId() {
-  if (appState.selectedFlowId && appState.packets.some((entry) => entry.flow_id === appState.selectedFlowId)) {
-    return appState.selectedFlowId;
+  // 1) 显式选中的 flow
+  if (appState.selectedFlowId) {
+    const source = appState.allPackets.length ? appState.allPackets : appState.packets;
+    if (source.some((entry) => entry.flow_id === appState.selectedFlowId)) {
+      return appState.selectedFlowId;
+    }
   }
+  // 2) currentFlowId（最近一次启动的 flow）
+  if (appState.currentFlowId) return appState.currentFlowId;
+  // 3) 最近一次出现过的 flow
   return latestFlowId();
 }
 
 function packetsForFlow(flowId) {
-  if (!flowId) return appState.packets;
-  return appState.packets.filter((entry) => entry.flow_id === flowId);
+  // 使用 realPackets（去重后的真实包）作为源；按 flowId 过滤
+  const source = appState.realPackets.length ? appState.realPackets : appState.packets;
+  if (!flowId) return source;
+  return source.filter((entry) => entry.flow_id === flowId);
 }
 
 function sequencePackets(flowId) {
-  const flowPackets = packetsForFlow(flowId);
-  const source = flowPackets.filter(isSendPacket);
-  const packets = source.length ? source : flowPackets;
+  // 协议时序与包列表共享同一份数据：realPackets（已按 (flow_id, packet_uid) 去重）。
+  // 这样时序与列表的 data-packet-index 索引、selectedPacket 引用都一致，点击高亮同步。
+  const flowRealPackets = appState.realPackets.filter(
+    (entry) => !flowId || entry.flow_id === flowId
+  );
+  // realPackets 已经按 (flow_id, packet_uid) 跨端去重，每个 wire 包恰好一条。
+  // 这里再做一次按时间排序、把对端 paired 记录挂到 canonical 上即可。
+  const sorted = [...flowRealPackets].sort((a, b) => logTimeMs(a) - logTimeMs(b));
+  const packets = sorted.map((entry) => {
+    // 找同 (flow_id, packet_uid) 但 role 不同的对端记录作为 paired
+    if (!entry.packet_uid) {
+      return entry;
+    }
+    const paired = appState.realPackets.filter(
+      (e) => e !== entry && e.flow_id === entry.flow_id && e.packet_uid === entry.packet_uid
+    );
+    if (paired.length) {
+      entry.paired_logs = paired;
+    }
+    return entry;
+  });
   const dataPackets = packets.filter((entry) => entry.packet_type === "DATA");
   const expanded = flowId ? appState.sequenceExpandedFlows.has(flowId) : false;
   const shouldFoldData = !expanded && dataPackets.length > 4;
@@ -1005,12 +1245,17 @@ function updateTopbar(run) {
   const clientRunning = appState.status.client?.running;
   byId("server-pill").textContent = t("statusServer", {value: serverRunning ? t("running") : t("stopped")});
   byId("client-pill").textContent = t("statusClient", {value: clientRunning ? t("running") : t("stopped")});
-  byId("phase-pill").textContent = t("statusPhase", {value: phaseLabel(run.phase)});
-  byId("result-pill").textContent = t("statusResult", {value: resultLabel(run.result)});
+  // 阶段和结果显示最近一次 flow 的状态
+  const displayPhase = appState.currentFlowId ? run.phase : "INIT";
+  const displayResult = appState.currentFlowId
+    ? (appState.lastFlowResult || run.result)
+    : "Pending";
+  byId("phase-pill").textContent = t("statusPhase", {value: phaseLabel(displayPhase)});
+  byId("result-pill").textContent = t("statusResult", {value: resultLabel(displayResult)});
   byId("server-pill").classList.toggle("is-running", Boolean(serverRunning));
   byId("client-pill").classList.toggle("is-running", Boolean(clientRunning));
-  byId("result-pill").classList.toggle("is-running", run.result === "OK");
-  byId("result-pill").classList.toggle("is-abort", run.result === "ABORT");
+  byId("result-pill").classList.toggle("is-running", displayResult === "OK");
+  byId("result-pill").classList.toggle("is-abort", displayResult === "ABORT");
   byId("server-dot").classList.toggle("is-running", Boolean(serverRunning));
   byId("client-dot").classList.toggle("is-running", Boolean(clientRunning));
 }
@@ -1048,7 +1293,11 @@ function renderDashboard(run) {
     </div>
   `;
   byId("digest-panel").innerHTML = digestMarkup(run, t("sha1Digest"));
-  renderLogList(byId("recent-logs"), appState.logs.slice(-8), true);
+  // 仪表盘"最近日志"也只显示当前 flow
+  const flowLogs = appState.currentFlowId
+    ? appState.logs.filter((e) => e.flow_id === appState.currentFlowId)
+    : [];
+  renderLogList(byId("recent-logs"), flowLogs.slice(-8), true);
 }
 
 function digestMarkup(run, title) {
@@ -1065,14 +1314,16 @@ function digestMarkup(run, title) {
 }
 
 function renderConfig(run) {
+  // 控制台"运行状态"显示最近一次 flow 的结果，直到点击"重置实验"
+  const displayResult = appState.lastFlowResult || (appState.currentFlowId ? run.result : "Pending");
   byId("config-state").innerHTML = `
     <div class="panel-head"><h2>${t("runStatus")}</h2><span class="hint">${t("httpWs")}</span></div>
     ${appState.notice ? `<div class="notice danger">${escapeHtml(appState.notice)}</div>` : ""}
     <div class="metric-grid">
       <div class="metric"><span>${t("serverPid")}</span><strong>${escapeHtml(appState.status.server?.pid || "-")}</strong></div>
       <div class="metric"><span>${t("clientPid")}</span><strong>${escapeHtml(appState.status.client?.pid || "-")}</strong></div>
-      <div class="metric"><span>${t("phase")}</span><strong>${phaseLabel(run.phase)}</strong></div>
-      <div class="metric"><span>${t("result")}</span><strong>${resultLabel(run.result)}</strong></div>
+      <div class="metric"><span>${t("phase")}</span><strong>${phaseLabel(appState.currentFlowId ? run.phase : "INIT")}</strong></div>
+      <div class="metric"><span>${t("result")}</span><strong>${resultLabel(displayResult)}</strong></div>
     </div>
   `;
 }
@@ -1080,55 +1331,148 @@ function renderConfig(run) {
 function renderInteractiveAttempt(run) {
   const attemptNode = byId("interactive-attempt");
   if (!attemptNode) return;
+
+  // 0) 空闲：未启动交互式客户端（或已被停止 / 完成）
   if (!appState.interactiveClientActive) {
-    attemptNode.classList.remove("is-waiting", "is-success", "is-danger");
+    attemptNode.classList.remove("is-waiting", "is-success", "is-danger", "is-stopped", "is-timeout", "is-error");
+    attemptNode.classList.add("is-idle");
+    const lastOutcome = appState.interactiveLastOutcome;
+    let hint = t("interactiveStartHint");
+    if (lastOutcome === "manual_stop") {
+      hint = t("interactiveLastStopped");
+    } else if (lastOutcome === "auto_end") {
+      hint = t("interactiveLastEnded");
+    }
     attemptNode.innerHTML = `
-      <span>${escapeHtml(t("interactiveClientIdle"))}</span>
-      <small>${escapeHtml(t("interactiveStartHint"))}</small>
+      <span>${escapeHtml(t("clientIdle"))}</span>
+      <small>${escapeHtml(hint)}</small>
     `;
     return;
   }
+
+  // 1) 仅统计本次启动之后的日志，限定到 current flow
   const scopedLogs = appState.clientRunStartedAt
     ? logsSince(appState.clientRunStartedAt, appState.clientRunLogIndex)
     : appState.logs;
-  const attempts = Math.min(Math.max(0, ...scopedLogs.map((entry) => Number(entry.attempt || 0))), 3);
-  const hasSuccess = scopedLogs.some((entry) => entry.event === "AUTH_SUCCESS" || entry.packet_type === "PASS_ACCEPT");
-  const hasAbort = scopedLogs.some((entry) => entry.event === "FINAL_ABORT" || entry.result === "ABORT" || entry.packet_type === "REJECT");
-  const nextAttempt = Math.min(Math.max(attempts + 1, 1), 3);
-  let title = t("passwordAttempt", {current: nextAttempt});
-  let hint = t("passwordAttemptReady");
+  const flowScoped = scopedLogs.filter(
+    (entry) => !appState.currentFlowId || entry.flow_id === appState.currentFlowId
+  );
+  // 已尝试次数 = 当前 flow 中最大的 attempt 值（取最小 3）
+  const attempts = Math.min(
+    Math.max(0, ...flowScoped.map((entry) => Number(entry.attempt || 0))),
+    3
+  );
+  const hasSuccess = flowScoped.some(
+    (entry) => entry.event === "AUTH_SUCCESS" || entry.packet_type === "PASS_ACCEPT"
+  );
+  const hasFail = flowScoped.some((entry) => entry.event === "AUTH_FAIL");
+  const hasReject = flowScoped.some((entry) => entry.packet_type === "REJECT");
+  const hasFinalOk = flowScoped.some((entry) => entry.event === "FINAL_OK");
+  const hasFinalAbort = flowScoped.some(
+    (entry) => entry.event === "FINAL_ABORT" || entry.result === "ABORT"
+  );
+  const hasTimeout = flowScoped.some((entry) => entry.event === "TIMEOUT");
+  const hasError = flowScoped.some(
+    (entry) =>
+      entry.level === "ERROR" &&
+      entry.event !== "AUTH_FAIL" &&
+      !hasFinalAbort &&
+      !hasTimeout
+  );
+  const clientStillRunning = Boolean(appState.status.client?.running);
+  // 用户主动停止（按钮点击）：当 interactiveClientActive 为 true 但 client 不再运行，且没有 FINAL 事件
+  const manuallyStopped = appState.interactiveClientActive && !clientStillRunning &&
+    !hasFinalOk && !hasFinalAbort && !hasSuccess && !hasFail && attempts < 3;
+  // 等待输入中：客户端运行中 & 没有终态
+  const waiting = clientStillRunning && !hasSuccess && !hasReject && !hasFinalOk && !hasFinalAbort && !hasTimeout;
+
+  let title = "";
+  let hint = "";
   let stateClass = "is-waiting";
-  if (hasSuccess) {
-    title = t("passwordAttemptComplete", {attempts: Math.max(attempts, 1)});
+  // attempts 的合理显示：若已 success/done，至少 1；其他情况按实际
+  const displayAttempts = Math.max(attempts, hasSuccess || hasFinalOk ? 1 : 0);
+  if (hasFinalOk) {
+    // 4) 一次传输正常结束
+    title = t("transferCompleted", {attempts: displayAttempts});
     stateClass = "is-success";
-  } else if (hasAbort || attempts >= 3) {
-    title = t("passwordAttemptFailed", {attempts});
+    hint = "";
+  } else if (hasSuccess) {
+    // 3) 认证成功
+    title = t("authSucceeded", {attempts: displayAttempts});
+    stateClass = "is-success";
+    hint = "";
+  } else if (hasReject) {
+    // 4) 三次认证失败（服务端发 REJECT）
+    title = t("authFailed", {attempts: 3});
     stateClass = "is-danger";
+    hint = "";
+  } else if (hasTimeout) {
+    // 7) 连接超时
+    title = t("authTimedOut", {attempts: displayAttempts});
+    stateClass = "is-timeout";
+    hint = "";
+  } else if (hasFinalAbort && hasError) {
+    // 8) 运行异常
+    title = t("authErrored", {attempts: displayAttempts});
+    stateClass = "is-error";
+    hint = "";
+  } else if (hasFinalAbort) {
+    title = t("authFailed", {attempts: displayAttempts});
+    stateClass = "is-danger";
+    hint = "";
+  } else if (manuallyStopped) {
+    // 5) 手动停止客户端：保留"上一轮已停止"上下文
+    appState.interactiveLastOutcome = "manual_stop";
+    title = t("clientRunningStopped", {attempts: displayAttempts});
+    stateClass = "is-stopped";
+    hint = "";
+  } else if (waiting) {
+    // 1) 等待输入密码
+    const nextAttempt = Math.min(Math.max(attempts + 1, 1), 3);
+    title = t("passwordAttemptWaiting", {current: nextAttempt});
+    hint = "";
+    stateClass = "is-waiting";
+  } else {
+    // 兜底（运行中但尚未等待输入）
+    title = t("clientRunning");
+    hint = "";
+    stateClass = "is-waiting";
   }
-  attemptNode.classList.remove("is-waiting", "is-success", "is-danger");
+
+  attemptNode.classList.remove(
+    "is-waiting", "is-success", "is-danger", "is-stopped",
+    "is-timeout", "is-error", "is-idle"
+  );
   attemptNode.classList.add(stateClass);
-  attemptNode.innerHTML = `
-    <span>${escapeHtml(title)}</span>
-    <small>${escapeHtml(hint)}</small>
-  `;
+  attemptNode.innerHTML = hint
+    ? `<span>${escapeHtml(title)}</span><small>${escapeHtml(hint)}</small>`
+    : `<span>${escapeHtml(title)}</span>`;
+
+  // 终态事件触发后，更新 idle 上下文，便于下次进入 idle 时展示
+  if (manuallyStopped) {
+    appState.interactiveLastOutcome = "manual_stop";
+  } else if (hasFinalOk || hasReject || hasTimeout || hasError || hasFinalAbort) {
+    appState.interactiveLastOutcome = "auto_end";
+  }
 }
 
 function filteredPackets() {
+  // 包列表展示所有 flow 的真实包（去重后）
+  const source = appState.realPackets.length ? appState.realPackets : appState.packets;
   const query = appState.packetFilters.query.trim().toLowerCase();
   const type = appState.packetFilters.type;
   const direction = appState.packetFilters.direction;
-  return appState.packets.filter((entry) => {
+  return source.filter((entry) => {
     const rawDirection = packetDirection(entry);
     const haystack = [
       entry.time,
-      entry.role,
-      roleLabel(entry.role),
       entry.event,
       entry.state,
       entry.message,
       entry.packet_type,
       entry.packet_id,
       entry.flow_id,
+      entry.packet_uid,
       entry.session_id,
       rawDirection,
       packetDirectionText(entry),
@@ -1148,9 +1492,11 @@ function renderProtocol() {
   const sequenceItems = sequencePackets(sequenceFlowId);
   const highlightedPacket = sequenceHighlightEntry(sequenceFlowId);
   appState.pagination.packets = packetPage.page;
-  byId("packet-count").textContent = packets.length === appState.packets.length
+  // 包列表显示所有 flow 的真实包（去重后）；"X / Y" 中的 Y 用 realPackets 总数
+  const allCount = appState.realPackets.length;
+  byId("packet-count").textContent = packets.length === allCount
     ? t("packetsNewest", {filtered: packets.length})
-    : t("packetsFiltered", {filtered: packets.length, total: appState.packets.length});
+    : t("packetsFiltered", {filtered: packets.length, total: allCount});
   byId("sequence-view").innerHTML = sequenceItems.map((item) => {
     if (item.kind === "toggle") {
       return `
@@ -1183,7 +1529,8 @@ function renderProtocol() {
     const flowClass = packetFlowClass(entry);
     const toServer = direction === "Client -> Server";
     const toClient = direction === "Server -> Client";
-    const packetIndex = appState.packets.indexOf(entry);
+    // 共享数据源：realPackets（已去重），点击时序列与列表都用同一索引
+    const packetIndex = appState.realPackets.indexOf(entry);
     const selected = entry === highlightedPacket ? "is-selected" : "";
     const status = packetStatus(entry);
     const messageName = `${entry.packet_type}${entry.packet_id !== undefined ? ` #${entry.packet_id}` : ""}`;
@@ -1201,18 +1548,19 @@ function renderProtocol() {
   }).join("") || `<p class="inspector-empty">${t("noPackets")}</p>`;
 
   byId("packet-table-body").innerHTML = packetPage.rows.map(({item: entry}) => {
-    const sourceIndex = appState.packets.indexOf(entry);
+    const sourceIndex = appState.realPackets.indexOf(entry);
     const identifier = packetIdentifier(entry);
     const directionText = packetDirectionText(entry);
-    const roleText = roleLabel(entry.role);
-    const packetTitle = `${entry.packet_type || "-"} ${entry.event || ""}`.trim();
+    const packetCode = packetCodes[entry.packet_type] || entry.packet_code || 0;
+    const packetTitle = `${entry.packet_type || "-"} · UID ${entry.packet_uid || "-"}`.trim();
     return `
     <tr data-packet-index="${sourceIndex}" class="${appState.selectedPacket === entry ? "is-selected" : ""}">
       <td class="num-cell" title="${sourceIndex + 1}">${sourceIndex + 1}</td>
       <td class="mono" title="${escapeHtml(entry.time)}">${escapeHtml(entry.time)}</td>
+      <td class="mono col-flow-cell" title="${escapeHtml(entry.flow_id || "-")}">${escapeHtml(entry.flow_id || "-")}</td>
+      <td class="packet-cell" title="${escapeHtml(packetTitle)}">${escapeHtml(entry.packet_type)}</td>
       <td title="${escapeHtml(directionText)}">${escapeHtml(directionText)}</td>
-      <td title="${escapeHtml(roleText)}">${escapeHtml(roleText)}</td>
-      <td class="packet-cell" title="${escapeHtml(packetTitle)}"><span class="packet-inline"><strong>${escapeHtml(entry.packet_type)}</strong><span class="hint">${escapeHtml(entry.event || "-")}</span></span></td>
+      <td class="num-cell" title="${packetCode}">${packetCode}</td>
       <td class="num-cell" title="${escapeHtml(entry.payload_length ?? "-")}">${escapeHtml(entry.payload_length ?? "-")}</td>
       <td title="${escapeHtml(identifier.title)}">${escapeHtml(identifier.text)}</td>
       <td title="${escapeHtml(entry.state || "-")}">${escapeHtml(entry.state || "-")}</td>
@@ -1224,26 +1572,101 @@ function renderProtocol() {
 }
 
 function renderInspector() {
-  const packet = appState.selectedPacket || appState.packets[appState.packets.length - 1];
+  const source = appState.realPackets.length ? appState.realPackets : appState.packets;
+  const packet = appState.selectedPacket || source[source.length - 1];
   if (!packet) {
     byId("packet-inspector").innerHTML = `<p class="inspector-empty">${t("selectPacket")}</p>`;
     return;
   }
+  const wireHex = packet.wire_hex || t("redactedPacket");
+  // 解析出的协议字段合并到主 field-list（不再单独区块）
+  const parsed = parsePacketFields(packet);
+  const mainRows = [
+    {label: t("packet"), value: escapeHtml(packet.packet_type)},
+    {label: t("flowId"), value: escapeHtml(packet.flow_id || "-"), mono: true},
+    {label: t("direction"), value: escapeHtml(packetDirectionText(packet))},
+    {label: t("typeCode"), value: String(packetCodes[packet.packet_type] || packet.packet_code || "?")},
+    {label: t("payloadLength"), value: `${escapeHtml(packet.payload_length ?? 0)} B`},
+    {label: t("packetId"), value: escapeHtml(packetIdentifier(packet).text), title: escapeHtml(packetIdentifier(packet).title)},
+    {label: t("state"), value: escapeHtml(packet.state || "-")},
+    {label: t("time"), value: escapeHtml(packet.time), mono: true},
+  ];
+  // 追加 wire-level 协议字段（如 DATA 的 packet_id / payload hex，TERMINATE 的 SHA1）
+  parsed.forEach((row) => {
+    mainRows.push({label: row.label, value: row.value, mono: true});
+  });
   byId("packet-inspector").innerHTML = `
     <div class="field-list">
-      <div><span>${t("packet")}</span><strong>${escapeHtml(packet.packet_type)}</strong></div>
-      <div><span>${t("flowId")}</span><strong>${escapeHtml(packet.flow_id || "-")}</strong></div>
-      <div><span>${t("typeCode")}</span><strong>${packetCodes[packet.packet_type] || "?"}</strong></div>
-      <div><span>${t("payloadLength")}</span><strong>${escapeHtml(packet.payload_length ?? 0)}</strong></div>
-      <div><span>${t("packetId")}</span><strong title="${escapeHtml(packetIdentifier(packet).title)}">${escapeHtml(packetIdentifier(packet).text)}</strong></div>
-      <div><span>${t("direction")}</span><strong>${escapeHtml(packetDirectionText(packet))}</strong></div>
-      <div><span>${t("role")}</span><strong>${escapeHtml(roleLabel(packet.role))}</strong></div>
-      <div><span>${t("state")}</span><strong>${escapeHtml(packet.state || "-")}</strong></div>
-      <div><span>${t("time")}</span><strong>${escapeHtml(packet.time)}</strong></div>
+      ${mainRows.map((r) => `
+        <div><span>${r.label}</span><strong${r.mono ? ' class="mono"' : ""}${r.title ? ` title="${r.title}"` : ""}>${r.value}</strong></div>
+      `).join("")}
     </div>
     <h3 class="inspector-subhead">${t("wireHex")}</h3>
-    <code class="packet-hex">${escapeHtml(packet.wire_hex || t("redactedPacket"))}</code>
+    <code class="packet-hex">${escapeHtml(wireHex)}</code>
   `;
+}
+
+/**
+ * 按 packet_type 解析 wire_hex，得到该包的结构化字段
+ * 不依赖运行时模糊字符串匹配；优先用后端给的 wire_hex（如果可用）
+ */
+function parsePacketFields(packet) {
+  const hex = String(packet.wire_hex || "").replace(/\s+/g, "");
+  const fields = [];
+  if (!hex) return fields;
+  // 通用：packet_uid
+  if (packet.packet_uid) {
+    fields.push({label: "packet_uid", value: packet.packet_uid});
+  }
+  // 通用：direction
+  fields.push({label: "direction", value: packetDirectionText(packet)});
+  // 按包类型解析
+  const type = packet.packet_type;
+  if (type === "DATA") {
+    // DATA: type(2) + payload_len(4) + packet_id(4) + payload
+    if (hex.length >= 20) {
+      const typeHex = hex.slice(0, 4);
+      const lenHex = hex.slice(4, 12);
+      const idHex = hex.slice(12, 20);
+      const payloadHex = hex.slice(20);
+      fields.push({label: "wire.type", value: `${typeHex} (${parseInt(typeHex, 16)})`});
+      fields.push({label: "wire.payload_length", value: `${parseInt(lenHex, 16)} B`});
+      fields.push({label: "wire.packet_id", value: `${parseInt(idHex, 16)}`});
+      fields.push({label: "wire.payload", value: payloadHex ? `${payloadHex.slice(0, 64)}${payloadHex.length > 64 ? "…" : ""}` : "(empty)"});
+    }
+  } else if (type === "TERMINATE") {
+    // TERMINATE: type(2) + payload_len(4) + SHA1(20 bytes)
+    if (hex.length >= 12) {
+      const typeHex = hex.slice(0, 4);
+      const lenHex = hex.slice(4, 12);
+      const digestHex = hex.slice(12, 52);
+      fields.push({label: "wire.type", value: `${typeHex} (${parseInt(typeHex, 16)})`});
+      fields.push({label: "wire.payload_length", value: `${parseInt(lenHex, 16)} B`});
+      fields.push({label: "wire.sha1", value: digestHex || "(missing)"});
+    }
+  } else if (type === "PASS_RESP") {
+    if (hex.length >= 12) {
+      const typeHex = hex.slice(0, 4);
+      const lenHex = hex.slice(4, 12);
+      fields.push({label: "wire.type", value: `${typeHex} (${parseInt(typeHex, 16)})`});
+      fields.push({label: "wire.payload_length", value: `${parseInt(lenHex, 16)} B`});
+      fields.push({label: "wire.payload", value: "(redacted: password)"});
+    }
+  } else {
+    // JOIN_REQ / PASS_REQ / PASS_ACCEPT / REJECT: type(2) + payload_len(4) [+ payload]
+    if (hex.length >= 12) {
+      const typeHex = hex.slice(0, 4);
+      const lenHex = hex.slice(4, 12);
+      const payloadLen = parseInt(lenHex, 16);
+      fields.push({label: "wire.type", value: `${typeHex} (${parseInt(typeHex, 16)})`});
+      fields.push({label: "wire.payload_length", value: `${payloadLen} B`});
+      const rest = hex.slice(12);
+      if (rest && payloadLen > 0) {
+        fields.push({label: "wire.payload", value: `${rest.slice(0, 64)}${rest.length > 64 ? "…" : ""}`});
+      }
+    }
+  }
+  return fields;
 }
 
 function renderTransfer(run) {
@@ -1297,12 +1720,30 @@ function renderLogList(container, logs, compact = false) {
   }).join("") || `<p class="inspector-empty">${t("noLogs")}</p>`;
 }
 
+// 实时日志：标准表格 + 表头，5 列（时间 / 级别 / 角色 / 事件 / 消息）
+function renderLogTable(tbody, logs) {
+  if (!tbody) return;
+  tbody.innerHTML = logs.map((entry) => {
+    const isError = ["ERROR", "ABORT", "WARN"].includes(entry.level);
+    const message = `${entry.state || ""} ${entry.packet_type || ""} ${entry.message || ""}`.trim() || "-";
+    return `
+      <tr class="log-row ${isError ? "is-error" : ""}">
+        <td class="mono col-time" title="${escapeHtml(entry.time)}">${escapeHtml(entry.time)}</td>
+        <td class="col-level"><span class="log-level log-level-${escapeHtml(String(entry.level || "INFO").toLowerCase())}">${escapeHtml(entry.level || "-")}</span></td>
+        <td class="col-role" title="${escapeHtml(entry.role || "-")}">${escapeHtml(roleLabel(entry.role))}</td>
+        <td class="col-event" title="${escapeHtml(entry.event || "-")}">${escapeHtml(entry.event || "-")}</td>
+        <td class="col-message" title="${escapeHtml(message)}">${escapeHtml(message)}</td>
+      </tr>
+    `;
+  }).join("") || `<tr><td colspan="5" class="inspector-empty">${t("noLogs")}</td></tr>`;
+}
+
 function renderLogs() {
   const logs = filteredLogs();
   const logPage = paginateNewest(logs, appState.pagination.logs);
   appState.pagination.logs = logPage.page;
   byId("log-count").textContent = t("logEntries", {count: logs.length});
-  renderLogList(byId("full-log-list"), logPage.rows.map((row) => row.item));
+  renderLogTable(byId("full-log-tbody"), logPage.rows.map((row) => row.item));
   renderPager(byId("log-pager"), "logs", logPage.page, logPage.totalPages, logPage.total);
 }
 
@@ -1337,7 +1778,43 @@ async function refreshStatus() {
 async function refreshLogs() {
   const data = await window.Api.logs();
   mergeLogs([...(data.server || []), ...(data.client || []), ...(data.control || [])]);
+  await refreshPackets();
   render();
+}
+
+/**
+ * 从后端 /api/packets 拉取结构化包数据。
+ * 这是包列表和协议时序的权威数据源——独立于普通 log，方便隔离日志噪声。
+ * 失败时（例如后端尚未建立 packets.jsonl）静默回退到从 logs 推断。
+ */
+async function refreshPackets() {
+  try {
+    const data = await window.Api.packets();
+    if (data && Array.isArray(data.packets)) {
+      // 把后端 packets 写回 appState.logs（去重），触发 ensureFlowIds
+      const existingKeys = new Set(appState.logs.map(logKey));
+      let added = 0;
+      for (const p of data.packets) {
+        if (!existingKeys.has(logKey(p))) {
+          appState.logs.push(p);
+          existingKeys.add(logKey(p));
+          added += 1;
+        }
+      }
+      if (added > 0) {
+        appState.logs.sort((a, b) => String(a.time).localeCompare(String(b.time)));
+        appState.logs = appState.logs.slice(-1200);
+        ensureFlowIds();
+        appState.allPackets = appState.logs.filter((entry) => entry.packet_type);
+        appState.realPackets = buildRealPackets(appState.allPackets);
+        appState.packets = appState.currentFlowId
+          ? appState.allPackets.filter((entry) => entry.flow_id === appState.currentFlowId)
+          : appState.allPackets;
+      }
+    }
+  } catch (err) {
+    // 静默：仍由 /api/logs 路径兜底
+  }
 }
 
 async function waitForSimulationResult(startedAt, fallbackIndex, predicate, timeoutMs = 8000) {
@@ -1402,6 +1879,8 @@ function wireEvents() {
       setNotice(pathError);
       return;
     }
+    // 启动一次新的 server 流程
+    beginServerFlow();
     const result = await window.Api.startServer(data);
     setNotice(result.ok === false ? localizeError(result.error || t("serverStartFailed")) : "");
     setTimeout(refreshStatus, 250);
@@ -1422,6 +1901,8 @@ function wireEvents() {
     } else {
       resetInteractiveAttemptState();
     }
+    // 启动一次新的 client 流程
+    beginClientFlow();
     renderInteractiveAttempt(deriveRun());
     const result = await window.Api.startClient(data);
     if (result.ok === false) {
@@ -1437,13 +1918,6 @@ function wireEvents() {
 
   byId("theme-select").addEventListener("change", (event) => {
     setTheme(event.currentTarget.value);
-    // 同步更新主题卡片高亮
-    if (window.ThemeManager) {
-      const cards = document.querySelectorAll('[data-theme-card]');
-      cards.forEach((card) => {
-        card.classList.toggle('is-active', card.dataset.themeCard === event.currentTarget.value);
-      });
-    }
   });
 
   byId("language-select").addEventListener("change", (event) => {
@@ -1464,10 +1938,12 @@ function wireEvents() {
 
   byId("stop-server-btn").addEventListener("click", async () => {
     await window.Api.stopServer();
+    resetInteractiveAttemptState();
     await refreshStatus();
   });
   byId("stop-client-btn").addEventListener("click", async () => {
     await window.Api.stopClient();
+    resetInteractiveAttemptState();
     await refreshStatus();
   });
   byId("send-password-btn").addEventListener("click", async () => {
@@ -1476,15 +1952,16 @@ function wireEvents() {
   });
   [byId("reset-btn"), byId("rail-reset-btn")].forEach((button) => {
     button.addEventListener("click", async () => {
+      // 后端：停止所有子进程并清空日志文件（保留日志目录）
       await window.Api.reset();
-      resetFrontendRunState();
+      // 前端：清空所有状态、日志、包、协议时序、测试、密码态、当前 flow
+      resetFrontendRunState({clearFilters: true});
+      // 立即重新拉取后端状态（C 端日志已被清空，UI 立即显示初始态）
       await refreshStatus();
+      await refreshLogs();
+      // 主动 render 一次确保所有面板回到初始干净状态
+      render();
     });
-  });
-  byId("clear-logs-btn").addEventListener("click", async () => {
-    await window.Api.clearLogs();
-    resetFrontendRunState();
-    render();
   });
   byId("refresh-logs-btn").addEventListener("click", refreshLogs);
   byId("view-full-logs-btn").addEventListener("click", () => {
@@ -1552,16 +2029,32 @@ function wireEvents() {
     const packetTarget = event.target.closest("[data-packet-index]");
     if (packetTarget) {
       const index = Number(packetTarget.dataset.packetIndex);
-      appState.selectedPacket = appState.packets[index];
-      appState.selectedFlowId = appState.selectedPacket?.flow_id || null;
-      renderProtocol();
+      // 共享数据源：realPackets（与表格 / 时序 render 同一份），确保 selectedPacket 与高亮一致
+      const entry = appState.realPackets[index];
+      if (entry) {
+        appState.selectedPacket = entry;
+        appState.selectedFlowId = entry.flow_id || null;
+        // 点击包：协议时序切换到该包所属 flow
+        if (entry.flow_id) {
+          appState.currentFlowId = entry.flow_id;
+          appState.packets = appState.realPackets.filter((e) => e.flow_id === entry.flow_id);
+        }
+      }
+      render();
       return;
     }
     const fragment = event.target.closest("[data-fragment-id]");
     if (fragment) {
       const id = Number(fragment.dataset.fragmentId);
-      appState.selectedPacket = appState.packets.find((entry) => entry.packet_type === "DATA" && Number(entry.packet_id) === id) || null;
-      appState.selectedFlowId = appState.selectedPacket?.flow_id || null;
+      const found = appState.realPackets.find((entry) => entry.packet_type === "DATA" && Number(entry.packet_id) === id) || null;
+      if (found) {
+        appState.selectedPacket = found;
+        appState.selectedFlowId = found.flow_id || null;
+        if (found.flow_id) {
+          appState.currentFlowId = found.flow_id;
+          appState.packets = appState.realPackets.filter((e) => e.flow_id === found.flow_id);
+        }
+      }
       appState.activeTab = "protocol";
       document.querySelector("[data-tab='protocol']").click();
     }
@@ -1570,6 +2063,7 @@ function wireEvents() {
   byId("run-tests-btn").addEventListener("click", async () => {
     setNotice("");
     setTestRows([{id: "test_suite", pass: null}], "suite");
+    beginSimulationFlow();
     const result = await window.Api.runTests();
     if (result.ok === false) {
       setTestRows([{id: "test_suite", pass: false}], "suite");
@@ -1585,9 +2079,11 @@ function wireEvents() {
     const clientForm = formObject(byId("client-form"));
     setNotice("");
     setTestRows([{id: "auth_failed", pass: null}], "auth_failed");
-    await window.Api.reset();
-    resetFrontendRunState();
+    // 不调用 /api/reset：保留已有日志；只停止可能在跑的子进程
+    await window.Api.stopServer();
+    await window.Api.stopClient();
     setTestRows([{id: "auth_failed", pass: null}], "auth_failed");
+    beginSimulationFlow();
     await refreshStatus();
     const startedAt = Date.now();
     const fallbackIndex = null;
@@ -1630,9 +2126,11 @@ function wireEvents() {
     const clientForm = formObject(byId("client-form"));
     setNotice("");
     setTestRows([{id: "timeout", pass: null}], "timeout");
-    await window.Api.reset();
-    resetFrontendRunState();
+    // 不调用 /api/reset：保留已有日志；只停止可能在跑的子进程
+    await window.Api.stopServer();
+    await window.Api.stopClient();
     setTestRows([{id: "timeout", pass: null}], "timeout");
+    beginSimulationFlow();
     await refreshStatus();
     const startedAt = Date.now();
     const fallbackIndex = null;
@@ -1688,10 +2186,6 @@ async function boot() {
   if (savedTheme && legacyMap[savedTheme]) savedTheme = legacyMap[savedTheme];
   if (window.ThemeManager) {
     window.ThemeManager.init();
-    window.ThemeManager.renderPicker(
-      byId("theme-picker"),
-      appState.language
-    );
   }
   setTheme(savedTheme || (window.ThemeManager ? window.ThemeManager.defaultTheme : "neumorph"));
   applyLanguage();
