@@ -27,9 +27,29 @@ const appState = {
   flowCounter: 0,            // 全局递增 ID
   sequenceExpandedFlows: new Set(),
   packetFilters: {
-    query: "",
     type: "",
     direction: "",
+    flow: "",
+    state: "",
+    sort: "newest",
+  },
+  logFilters: {
+    role: "",
+    level: "",
+    event: "",
+    /* timeRange: 时间区间预设。可选值：
+         "all"    — 全部（默认，不应用时间过滤）
+         "1m"     — 最近 1 分钟
+         "5m"     — 最近 5 分钟
+         "30m"    — 最近 30 分钟
+         "custom" — 自定义（用 timeFrom + timeTo 输入框的值）
+       用预设的好处是 "1 分钟前 / 5 分钟前" 这种相对概念是动态的，
+       不会"5 分钟后用户的过滤区间还停留在点击那一刻的 5 分钟前"。 */
+    timeRange: "all",
+    timeFrom: "",
+    timeTo: "",
+    sort: "newest",
+    errorOnly: false,
   },
   pagination: {
     packets: 1,
@@ -105,8 +125,24 @@ const i18n = {
     packetInspector: "包检查器",
     packetWireHint: "类型: 2B, 载荷长度: 4B",
     packetList: "包列表",
-    allPacketTypes: "全部包类型",
-    allDirections: "全部方向",
+    allPacketTypes: "类型",
+    allDirections: "方向",
+    allFlows: "流",
+    allStates: "状态",
+    allEvents: "事件",
+    sortNewest: "最新优先",
+    sortOldest: "最旧优先",
+    clearAll: "清空",
+    clearTime: "清空时段",
+    firstPage: "首页",
+    lastPage: "末页",
+    timeRange: "时间",
+    rangeAll: "全部",
+    range1m: "1 分钟",
+    range5m: "5 分钟",
+    range30m: "30 分钟",
+    rangeCustom: "自定义",
+    customRange: "自定义时段",
     clientToServer: "客户端到服务端",
     serverToClient: "服务端到客户端",
     observed: "观察到",
@@ -123,12 +159,13 @@ const i18n = {
     fragmentHint: "每格代表一个 DATA packet_id",
     logFilters: "日志过滤",
     logFormatHint: "JSON 行日志",
-    allRoles: "全部角色",
-    serverRole: "服务端",
-    clientRole: "客户端",
-    controlRole: "控制端",
-    allLevels: "全部级别",
-    errorsOnly: "只看异常",
+    allRoles: "角色",
+    serverRole: "server",
+    clientRole: "client",
+    controlRole: "control",
+    allLevels: "级别",
+    errorsOnly: "仅异常",
+    errorStateAll: "全部",
     realtimeLogs: "实时日志",
     level: "级别",
     event: "事件",
@@ -215,8 +252,10 @@ const i18n = {
     packetsFiltered: "{filtered} / {total} 个包 · 最新优先",
     noPackets: "暂无协议包。启动客户端后会出现 JOIN_REQ。",
     dataFolded: "已折叠 × {count}",
-    dataFoldedRange: "DATA #{first} ... DATA #{last}",
+    dataFoldedRange: "DATA #{first} — DATA #{last}",
     dataExpanded: "DATA 分片已展开",
+    foldStartMarker: "DATA #{id} 之前被折叠 · 共 {count} 个",
+    foldEndMarker: "DATA #{id} 之前被折叠",
     expandData: "点击展开",
     collapseData: "点击折叠",
     stageControl: "控制阶段",
@@ -231,6 +270,10 @@ const i18n = {
     selectPacket: "选择一个包查看 type、payload length、packet id 和原始十六进制字段。",
     typeCode: "类型码",
     payloadLength: "载荷长度",
+    packetUid: "包 UID",
+    wireDetails: "线缆层细节",
+    wirePayload: "载荷字节",
+    wireSha1: "SHA1 摘要",
     authPayloadLength: "认证载荷 {bytes} B",
     dataFragmentId: "DATA 分片 #{id}",
     noPacketId: "控制包无分片 ID",
@@ -248,8 +291,6 @@ const i18n = {
     pageStatus: "第 {page} / {totalPages} 页 · 共 {total} 条",
     prevPage: "上一页",
     nextPage: "下一页",
-    logSearchPlaceholder: "搜索事件、状态、消息",
-    packetSearchPlaceholder: "搜索类型、包 ID、方向或关键字",
     inputPathEmpty: "输入文件路径不能为空。",
     outputPathEmpty: "输出文件路径不能为空。",
     inputPathRelativeOnly: "输入文件路径只支持相对路径。",
@@ -310,8 +351,24 @@ const i18n = {
     packetInspector: "Packet Inspector",
     packetWireHint: "Type: 2B, PayloadLen: 4B",
     packetList: "Packet list",
-    allPacketTypes: "All packet types",
-    allDirections: "All directions",
+    allPacketTypes: "Type",
+    allDirections: "Dir",
+    allFlows: "Flow",
+    allStates: "State",
+    allEvents: "Event",
+    sortNewest: "Newest",
+    sortOldest: "Oldest",
+    clearAll: "Clear",
+    clearTime: "Clear range",
+    firstPage: "First",
+    lastPage: "Last",
+    timeRange: "Time",
+    rangeAll: "All",
+    range1m: "1 min",
+    range5m: "5 min",
+    range30m: "30 min",
+    rangeCustom: "Custom",
+    customRange: "Custom range",
     clientToServer: "Client to Server",
     serverToClient: "Server to Client",
     observed: "Observed",
@@ -334,6 +391,7 @@ const i18n = {
     controlRole: "control",
     allLevels: "All levels",
     errorsOnly: "Errors only",
+    errorStateAll: "All",
     realtimeLogs: "Live logs",
     level: "Level",
     event: "Event",
@@ -420,8 +478,10 @@ const i18n = {
     packetsFiltered: "{filtered} / {total} packets · newest first",
     noPackets: "No protocol packets yet. Start the client to see JOIN_REQ.",
     dataFolded: "Folded × {count}",
-    dataFoldedRange: "DATA #{first} ... DATA #{last}",
+    dataFoldedRange: "DATA #{first} — DATA #{last}",
     dataExpanded: "DATA fragments expanded",
+    foldStartMarker: "DATA #{id} was folded · {count} total",
+    foldEndMarker: "DATA #{id} was folded",
     expandData: "Click to expand",
     collapseData: "Click to collapse",
     stageControl: "Control phase",
@@ -436,6 +496,10 @@ const i18n = {
     selectPacket: "Select a packet to inspect type, payload length, packet id, and raw hex fields.",
     typeCode: "Type code",
     payloadLength: "Payload length",
+    packetUid: "Packet UID",
+    wireDetails: "Wire-level details",
+    wirePayload: "Payload bytes",
+    wireSha1: "SHA1 digest",
     authPayloadLength: "Auth payload {bytes} B",
     dataFragmentId: "DATA fragment #{id}",
     noPacketId: "Control packet, no fragment ID",
@@ -453,8 +517,6 @@ const i18n = {
     pageStatus: "Page {page} / {totalPages} · Total {total}",
     prevPage: "Previous",
     nextPage: "Next",
-    logSearchPlaceholder: "Search event, state, message",
-    packetSearchPlaceholder: "Search type, Packet ID, direction, or keyword",
     inputPathEmpty: "Input file path is required.",
     outputPathEmpty: "Output file path is required.",
     inputPathRelativeOnly: "Input file path must be relative.",
@@ -537,13 +599,50 @@ function resetFrontendRunState({clearFilters = false} = {}) {
   appState.notice = "";
   resetInteractiveAttemptState();
   if (clearFilters) {
-    appState.packetFilters.query = "";
+    // 包过滤
     appState.packetFilters.type = "";
     appState.packetFilters.direction = "";
-    ["packet-search-filter", "packet-type-filter", "packet-direction-filter"].forEach((id) => {
+    appState.packetFilters.flow = "";
+    appState.packetFilters.state = "";
+    appState.packetFilters.sort = "newest";
+    // 日志过滤
+    appState.logFilters.role = "";
+    appState.logFilters.level = "";
+    appState.logFilters.event = "";
+    appState.logFilters.timeRange = "all";
+    appState.logFilters.timeFrom = "";
+    appState.logFilters.timeTo = "";
+    appState.logFilters.sort = "newest";
+    appState.logFilters.errorOnly = false;
+    // 同步 DOM
+    ["packet-type-filter", "packet-direction-filter", "packet-flow-filter",
+     "packet-state-filter", "packet-sort", "role-filter", "level-filter",
+     "log-event-filter", "log-time-from", "log-time-to", "log-sort"].forEach((id) => {
       const node = byId(id);
       if (node) node.value = "";
     });
+    // sort / timeRange 各自有固定默认值（不是空字符串）
+    const sortNode = byId("packet-sort");
+    if (sortNode) sortNode.value = "newest";
+    const logSortNode = byId("log-sort");
+    if (logSortNode) logSortNode.value = "newest";
+    // 错误过滤分段控件：把"全部"段标为 active
+    const errToggle = byId("log-error-only-toggle");
+    if (errToggle) {
+      errToggle.querySelectorAll(".seg-btn").forEach((btn) => {
+        btn.classList.toggle("is-active", btn.dataset.state === "all");
+      });
+    }
+    // 时间分段控件：把"全部"段标为 active
+    const segGroup = byId("log-time-range");
+    if (segGroup) {
+      segGroup.querySelectorAll(".seg-btn").forEach((btn) => {
+        btn.classList.toggle("is-active", btn.dataset.range === "all");
+      });
+    }
+    // 隐藏自定义时段行
+    const customRow = byId("log-custom-time-row");
+    if (customRow) customRow.classList.add("is-hidden");
   }
 }
 
@@ -1083,61 +1182,108 @@ function sequencePackets(flowId) {
   });
   const dataPackets = packets.filter((entry) => entry.packet_type === "DATA");
   const expanded = flowId ? appState.sequenceExpandedFlows.has(flowId) : false;
-  const shouldFoldData = !expanded && dataPackets.length > 4;
-  const firstData = dataPackets.slice(0, 3);
-  const lastData = dataPackets.length > 4 ? dataPackets[dataPackets.length - 1] : null;
-  const displayedData = shouldFoldData ? new Set([...firstData, lastData].filter(Boolean)) : new Set(dataPackets);
-  const result = [];
-  let insertedEllipsis = false;
-  let insertedToggle = false;
+  const FOLD_THRESHOLD = 4;
+  const shouldFold = dataPackets.length > FOLD_THRESHOLD;
+  /* 被折叠的"中段"：dataPackets[3] 到 dataPackets[length-2]（即首 3 + 末 1 之外）。
+     折叠时只显示首 3 + 末 1；展开时全显示，但用 full-width bar 在 [3] 之前和 [length-2] 之后
+     各打一个标记（"DATA #3 · 之前被折叠" / "DATA #64 · 之前被折叠"），让用户一眼看出
+     "这段原来是折叠的，现在展开了"。 */
+  const FOLD_HEAD = 3;
+  const FOLD_TAIL = 1;
+  const foldStartIdx = FOLD_HEAD;
+  const foldEndIdx = dataPackets.length - FOLD_TAIL - 1;
+  const foldCount = dataPackets.length - FOLD_HEAD - FOLD_TAIL;
 
-  packets.forEach((entry) => {
-    if (entry.packet_type !== "DATA") {
+  const result = [];
+
+  if (shouldFold && expanded) {
+    /* 展开态：所有 DATA 包都显示；在 [foldStartIdx] 之前插入 start-bar，在 [foldEndIdx] 之后插入 end-bar。*/
+    packets.forEach((entry) => {
+      if (entry.packet_type !== "DATA") {
+        result.push({kind: "packet", entry});
+        return;
+      }
+      const dataIdx = dataPackets.indexOf(entry);
+      if (dataIdx === foldStartIdx) {
+        result.push({
+          kind: "foldStart",
+          packetId: entry.packet_id,
+          count: foldCount,
+        });
+      }
       result.push({kind: "packet", entry});
-      return;
-    }
-    if (expanded && dataPackets.length > 4 && !insertedToggle) {
-      result.push({kind: "toggle", expanded: true, count: dataPackets.length});
-      insertedToggle = true;
-    }
-    if (displayedData.has(entry)) {
-      result.push({kind: "packet", entry});
-      return;
-    }
-    if (!insertedEllipsis) {
-      const folded = dataPackets.filter((packet) => !displayedData.has(packet));
-      result.push({
-        kind: "ellipsis",
-        count: folded.length,
-        firstId: folded[0]?.packet_id ?? firstData.at(-1)?.packet_id ?? 0,
-        lastId: folded.at(-1)?.packet_id ?? lastData?.packet_id ?? 0,
-      });
-      insertedEllipsis = true;
-    }
-  });
+      if (dataIdx === foldEndIdx) {
+        result.push({
+          kind: "foldEnd",
+          packetId: entry.packet_id,
+        });
+      }
+    });
+  } else if (shouldFold) {
+    /* 折叠态：只显示首 3 + 末 1，中间一个 full-width bar 代替整段被折叠数据。 */
+    const firstData = dataPackets.slice(0, FOLD_HEAD);
+    const lastData = dataPackets[dataPackets.length - 1];
+    const displayed = new Set([...firstData, lastData]);
+    let insertedBar = false;
+    packets.forEach((entry) => {
+      if (entry.packet_type !== "DATA") {
+        result.push({kind: "packet", entry});
+        return;
+      }
+      if (displayed.has(entry)) {
+        result.push({kind: "packet", entry});
+        return;
+      }
+      if (!insertedBar) {
+        result.push({
+          kind: "ellipsis",
+          firstId: dataPackets[foldStartIdx]?.packet_id ?? 0,
+          lastId: dataPackets[foldEndIdx]?.packet_id ?? 0,
+          count: foldCount,
+        });
+        insertedBar = true;
+      }
+    });
+  } else {
+    /* DATA 包 <= FOLD_THRESHOLD，不需要折叠/展开逻辑 */
+    packets.forEach((entry) => result.push({kind: "packet", entry}));
+  }
 
   return result;
 }
 
-function paginateNewest(items, requestedPage) {
+function paginate(items, requestedPage, sortOrder) {
+  /* 通用分页：
+     - sortOrder="newest"（默认）：把 items 倒序，让最新的在前
+     - sortOrder="oldest"：保持原顺序（最旧的在前）
+     返回的 rows 已按排序结果切片好；调用方直接渲染即可。 */
   const total = items.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(Math.max(Number(requestedPage) || 1, 1), totalPages);
-  const newestFirst = items.map((item, index) => ({item, index})).reverse();
+  const indexed = items.map((item, index) => ({item, index}));
+  const ordered = sortOrder === "oldest" ? indexed : indexed.slice().reverse();
   const start = (currentPage - 1) * PAGE_SIZE;
   return {
     page: currentPage,
     total,
     totalPages,
-    rows: newestFirst.slice(start, start + PAGE_SIZE),
+    rows: ordered.slice(start, start + PAGE_SIZE),
   };
 }
 
 function renderPager(container, target, page, totalPages, total) {
+  /* 4 按钮：首页 / 上一页 / 下一页 / 末页。
+     data-page-delta 用 Infinity / -Infinity 表达"跳到首/末"；
+     现有的 click handler 会用 Number() 转换，得到 +/-Infinity。
+     注意：第一/最后一页时分别禁用首页/末页的按钮。*/
+  const isFirst = page <= 1;
+  const isLast = page >= totalPages;
   container.innerHTML = `
-    <button class="pager-button" data-page-target="${target}" data-page-delta="-1" type="button" ${page <= 1 ? "disabled" : ""}>${t("prevPage")}</button>
+    <button class="pager-button" data-page-target="${target}" data-page-delta="-Infinity" type="button" ${isFirst ? "disabled" : ""} title="${escapeHtml(t("firstPage"))}">«</button>
+    <button class="pager-button" data-page-target="${target}" data-page-delta="-1" type="button" ${isFirst ? "disabled" : ""}>${t("prevPage")}</button>
     <span class="pager-status">${t("pageStatus", {page, totalPages, total})}</span>
-    <button class="pager-button" data-page-target="${target}" data-page-delta="1" type="button" ${page >= totalPages ? "disabled" : ""}>${t("nextPage")}</button>
+    <button class="pager-button" data-page-target="${target}" data-page-delta="1" type="button" ${isLast ? "disabled" : ""}>${t("nextPage")}</button>
+    <button class="pager-button" data-page-target="${target}" data-page-delta="Infinity" type="button" ${isLast ? "disabled" : ""} title="${escapeHtml(t("lastPage"))}">»</button>
   `;
 }
 
@@ -1188,10 +1334,6 @@ function applyLanguage() {
   });
   const languageSelect = byId("language-select");
   if (languageSelect) languageSelect.value = appState.language;
-  const searchFilter = byId("search-filter");
-  if (searchFilter) searchFilter.placeholder = t("logSearchPlaceholder");
-  const packetSearch = byId("packet-search-filter");
-  if (packetSearch) packetSearch.placeholder = t("packetSearchPlaceholder");
   [
     ["rail-server-status", "railServerStatus"],
     ["rail-client-status", "railClientStatus"],
@@ -1459,35 +1601,25 @@ function renderInteractiveAttempt(run) {
 function filteredPackets() {
   // 包列表展示所有 flow 的真实包（去重后）
   const source = appState.realPackets.length ? appState.realPackets : appState.packets;
-  const query = appState.packetFilters.query.trim().toLowerCase();
   const type = appState.packetFilters.type;
   const direction = appState.packetFilters.direction;
+  const flow = appState.packetFilters.flow;
+  const state = appState.packetFilters.state;
   return source.filter((entry) => {
     const rawDirection = packetDirection(entry);
-    const haystack = [
-      entry.time,
-      entry.event,
-      entry.state,
-      entry.message,
-      entry.packet_type,
-      entry.packet_id,
-      entry.flow_id,
-      entry.packet_uid,
-      entry.session_id,
-      rawDirection,
-      packetDirectionText(entry),
-      entry.payload_length,
-    ].join(" ").toLowerCase();
     if (type && entry.packet_type !== type) return false;
     if (direction && rawDirection !== direction) return false;
-    if (query && !haystack.includes(query)) return false;
+    if (flow && entry.flow_id !== flow) return false;
+    if (state && entry.state !== state) return false;
     return true;
   });
 }
 
 function renderProtocol() {
   const packets = filteredPackets();
-  const packetPage = paginateNewest(packets, appState.pagination.packets);
+  // 同步下拉选项：flow_id / state 需要根据当前 realPackets 动态生成
+  syncPacketFilterOptions();
+  const packetPage = paginate(packets, appState.pagination.packets, appState.packetFilters.sort);
   const sequenceFlowId = currentSequenceFlowId();
   const sequenceItems = sequencePackets(sequenceFlowId);
   const highlightedPacket = sequenceHighlightEntry(sequenceFlowId);
@@ -1498,30 +1630,51 @@ function renderProtocol() {
     ? t("packetsNewest", {filtered: packets.length})
     : t("packetsFiltered", {filtered: packets.length, total: allCount});
   byId("sequence-view").innerHTML = sequenceItems.map((item) => {
-    if (item.kind === "toggle") {
-      return `
-        <div class="sequence-row sequence-gap flow-to-client">
-          <span class="endpoint client is-target">${t("clientEndpoint")}</span>
-          <button class="sequence-line flow-to-client stage-data is-ellipsis sequence-toggle" data-sequence-toggle="${escapeHtml(sequenceFlowId || "")}" type="button">
-            <span class="status-icon data" aria-hidden="true"></span>
-            <strong>${escapeHtml(t("dataExpanded"))}</strong>
-            <span class="flow-meta">${escapeHtml(t("collapseData"))}</span>
-          </button>
-          <span class="endpoint server is-source">${t("serverEndpoint")}</span>
-        </div>
-      `;
-    }
+    /* 全宽折叠条：3 种 kind
+       - "ellipsis"（折叠态）：一个 bar，跨越整行，提示"DATA #first — #last · 省略 N 个 · 点击展开"
+       - "foldStart"（展开态左端）：bar 标记"DATA #first · 之前被折叠 · 点击折叠"
+       - "foldEnd"（展开态右端）：bar 标记"DATA #last · 之前被折叠 · 点击折叠"
+       视觉上 bar 与 packet row 不同（不是 sequence-row，没有 client/server endpoint），整宽
+       占据 sequence-view 的全部宽度。点击任何一个 bar 都触发同一个 toggle 逻辑。*/
     if (item.kind === "ellipsis") {
       return `
-        <div class="sequence-row sequence-gap flow-to-client">
-          <span class="endpoint client is-target">${t("clientEndpoint")}</span>
-          <button class="sequence-line flow-to-client stage-data is-ellipsis sequence-toggle" data-sequence-toggle="${escapeHtml(sequenceFlowId || "")}" type="button">
-            <span class="status-icon data" aria-hidden="true"></span>
-            <strong>${escapeHtml(t("dataFoldedRange", {first: item.firstId, last: item.lastId}))}</strong>
-            <span class="flow-meta">${escapeHtml(t("dataFolded", {count: item.count}))} · ${escapeHtml(t("expandData"))}</span>
-          </button>
-          <span class="endpoint server is-source">${t("serverEndpoint")}</span>
-        </div>
+        <button class="fold-bar sequence-toggle" data-sequence-toggle="${escapeHtml(sequenceFlowId || "")}" type="button" aria-label="${escapeHtml(t("expandData"))}">
+          <span class="fold-bar-line" aria-hidden="true"></span>
+          <span class="fold-bar-text">
+            <span class="fold-bar-dots" aria-hidden="true">⋯⋯⋯</span>
+            <span class="fold-bar-range">${escapeHtml(t("dataFoldedRange", {first: item.firstId, last: item.lastId}))}</span>
+            <span class="fold-bar-count">${escapeHtml(t("dataFolded", {count: item.count}))}</span>
+            <span class="fold-bar-action">${escapeHtml(t("expandData"))}</span>
+            <span class="fold-bar-dots" aria-hidden="true">⋯⋯⋯</span>
+          </span>
+          <span class="fold-bar-line" aria-hidden="true"></span>
+        </button>
+      `;
+    }
+    if (item.kind === "foldStart") {
+      return `
+        <button class="fold-bar sequence-toggle" data-sequence-toggle="${escapeHtml(sequenceFlowId || "")}" type="button" aria-label="${escapeHtml(t("collapseData"))}">
+          <span class="fold-bar-line" aria-hidden="true"></span>
+          <span class="fold-bar-text">
+            <span class="fold-bar-dots" aria-hidden="true">⋯⋯⋯</span>
+            <span class="fold-bar-marker">${escapeHtml(t("foldStartMarker", {id: item.packetId, count: item.count}))}</span>
+            <span class="fold-bar-action">${escapeHtml(t("collapseData"))}</span>
+          </span>
+          <span class="fold-bar-line" aria-hidden="true"></span>
+        </button>
+      `;
+    }
+    if (item.kind === "foldEnd") {
+      return `
+        <button class="fold-bar sequence-toggle" data-sequence-toggle="${escapeHtml(sequenceFlowId || "")}" type="button" aria-label="${escapeHtml(t("collapseData"))}">
+          <span class="fold-bar-line" aria-hidden="true"></span>
+          <span class="fold-bar-text">
+            <span class="fold-bar-dots" aria-hidden="true">⋯⋯⋯</span>
+            <span class="fold-bar-marker">${escapeHtml(t("foldEndMarker", {id: item.packetId}))}</span>
+            <span class="fold-bar-action">${escapeHtml(t("collapseData"))}</span>
+          </span>
+          <span class="fold-bar-line" aria-hidden="true"></span>
+        </button>
       `;
     }
     const entry = item.entry;
@@ -1579,11 +1732,14 @@ function renderInspector() {
     return;
   }
   const wireHex = packet.wire_hex || t("redactedPacket");
-  // 解析出的协议字段合并到主 field-list（不再单独区块）
-  const parsed = parsePacketFields(packet);
+  // 主字段清单：摘要级（friendly）。已与 parsePacketFields 严格去重——
+  // 类型码 / 载荷长度 / packet_id / 方向都只在这里出现一次；
+  // parsePacketFields 只补充"摘要里没有"的 wire-level 新信息（DATA 的载荷 hex、
+  // TERMINATE 的 SHA1、PASS_RESP 的脱敏提示）。
   const mainRows = [
     {label: t("packet"), value: escapeHtml(packet.packet_type)},
     {label: t("flowId"), value: escapeHtml(packet.flow_id || "-"), mono: true},
+    {label: t("packetUid"), value: escapeHtml(packet.packet_uid || "-"), mono: true},
     {label: t("direction"), value: escapeHtml(packetDirectionText(packet))},
     {label: t("typeCode"), value: String(packetCodes[packet.packet_type] || packet.packet_code || "?")},
     {label: t("payloadLength"), value: `${escapeHtml(packet.payload_length ?? 0)} B`},
@@ -1591,79 +1747,52 @@ function renderInspector() {
     {label: t("state"), value: escapeHtml(packet.state || "-")},
     {label: t("time"), value: escapeHtml(packet.time), mono: true},
   ];
-  // 追加 wire-level 协议字段（如 DATA 的 packet_id / payload hex，TERMINATE 的 SHA1）
-  parsed.forEach((row) => {
-    mainRows.push({label: row.label, value: row.value, mono: true});
-  });
+  const wireExtras = parsePacketFields(packet);
   byId("packet-inspector").innerHTML = `
     <div class="field-list">
       ${mainRows.map((r) => `
         <div><span>${r.label}</span><strong${r.mono ? ' class="mono"' : ""}${r.title ? ` title="${r.title}"` : ""}>${r.value}</strong></div>
       `).join("")}
     </div>
+    ${wireExtras.length ? `<h3 class="inspector-subhead">${t("wireDetails")}</h3>
+    <div class="field-list">
+      ${wireExtras.map((r) => `
+        <div><span>${r.label}</span><strong class="mono">${r.value}</strong></div>
+      `).join("")}
+    </div>` : ""}
     <h3 class="inspector-subhead">${t("wireHex")}</h3>
     <code class="packet-hex">${escapeHtml(wireHex)}</code>
   `;
 }
 
 /**
- * 按 packet_type 解析 wire_hex，得到该包的结构化字段
- * 不依赖运行时模糊字符串匹配；优先用后端给的 wire_hex（如果可用）
+ * 从 wire_hex 解析"摘要里没有的"额外字段。
+ * 严格不与主字段清单重复——不输出 type / payload_length / direction / packet_id
+ * 这些已经在 mainRows 里。仅当 wire 携带"摘要里看不到"的信息时才补充：
+ *   - DATA: payload 字节预览
+ *   - TERMINATE: SHA1 摘要
+ *   - PASS_RESP: 脱敏说明
+ *   - 其他: 无
  */
 function parsePacketFields(packet) {
   const hex = String(packet.wire_hex || "").replace(/\s+/g, "");
+  if (!hex) return [];
   const fields = [];
-  if (!hex) return fields;
-  // 通用：packet_uid
-  if (packet.packet_uid) {
-    fields.push({label: "packet_uid", value: packet.packet_uid});
-  }
-  // 通用：direction
-  fields.push({label: "direction", value: packetDirectionText(packet)});
-  // 按包类型解析
   const type = packet.packet_type;
   if (type === "DATA") {
-    // DATA: type(2) + payload_len(4) + packet_id(4) + payload
     if (hex.length >= 20) {
-      const typeHex = hex.slice(0, 4);
-      const lenHex = hex.slice(4, 12);
-      const idHex = hex.slice(12, 20);
       const payloadHex = hex.slice(20);
-      fields.push({label: "wire.type", value: `${typeHex} (${parseInt(typeHex, 16)})`});
-      fields.push({label: "wire.payload_length", value: `${parseInt(lenHex, 16)} B`});
-      fields.push({label: "wire.packet_id", value: `${parseInt(idHex, 16)}`});
-      fields.push({label: "wire.payload", value: payloadHex ? `${payloadHex.slice(0, 64)}${payloadHex.length > 64 ? "…" : ""}` : "(empty)"});
+      fields.push({label: t("wirePayload"), value: payloadHex
+        ? `${payloadHex.slice(0, 64)}${payloadHex.length > 64 ? "…" : ""}`
+        : "(empty)"});
     }
   } else if (type === "TERMINATE") {
-    // TERMINATE: type(2) + payload_len(4) + SHA1(20 bytes)
-    if (hex.length >= 12) {
-      const typeHex = hex.slice(0, 4);
-      const lenHex = hex.slice(4, 12);
-      const digestHex = hex.slice(12, 52);
-      fields.push({label: "wire.type", value: `${typeHex} (${parseInt(typeHex, 16)})`});
-      fields.push({label: "wire.payload_length", value: `${parseInt(lenHex, 16)} B`});
-      fields.push({label: "wire.sha1", value: digestHex || "(missing)"});
+    if (hex.length >= 52) {
+      fields.push({label: t("wireSha1"), value: hex.slice(12, 52) || "(missing)"});
     }
   } else if (type === "PASS_RESP") {
     if (hex.length >= 12) {
-      const typeHex = hex.slice(0, 4);
-      const lenHex = hex.slice(4, 12);
-      fields.push({label: "wire.type", value: `${typeHex} (${parseInt(typeHex, 16)})`});
-      fields.push({label: "wire.payload_length", value: `${parseInt(lenHex, 16)} B`});
-      fields.push({label: "wire.payload", value: "(redacted: password)"});
-    }
-  } else {
-    // JOIN_REQ / PASS_REQ / PASS_ACCEPT / REJECT: type(2) + payload_len(4) [+ payload]
-    if (hex.length >= 12) {
-      const typeHex = hex.slice(0, 4);
-      const lenHex = hex.slice(4, 12);
-      const payloadLen = parseInt(lenHex, 16);
-      fields.push({label: "wire.type", value: `${typeHex} (${parseInt(typeHex, 16)})`});
-      fields.push({label: "wire.payload_length", value: `${payloadLen} B`});
-      const rest = hex.slice(12);
-      if (rest && payloadLen > 0) {
-        fields.push({label: "wire.payload", value: `${rest.slice(0, 64)}${rest.length > 64 ? "…" : ""}`});
-      }
+      fields.push({label: t("wirePayload"), value: t("redactedPacket")});
     }
   }
   return fields;
@@ -1692,14 +1821,34 @@ function renderTransfer(run) {
 function filteredLogs() {
   const role = byId("role-filter")?.value || "";
   const level = byId("level-filter")?.value || "";
-  const search = (byId("search-filter")?.value || "").toLowerCase();
-  const errorOnly = byId("error-only")?.checked;
+  const event = byId("log-event-filter")?.value || "";
+  const errorOnly = appState.logFilters.errorOnly === true;
+  /* 时间区间：先看预设（timeRange 状态），预设里说"all" 则不过滤；说"1m/5m/30m"
+     就动态算"now - N 分钟"；说"custom" 才用两个输入框的绝对值。预设每次过滤都重算，
+     所以"1 分钟前"始终是相对于当前时刻的 1 分钟。 */
+  const preset = appState.logFilters.timeRange || "all";
+  let fromMs = null;
+  let toMs = null;
+  if (preset === "1m" || preset === "5m" || preset === "30m") {
+    const minutes = preset === "1m" ? 1 : preset === "5m" ? 5 : 30;
+    fromMs = Date.now() - minutes * 60 * 1000;
+    toMs = Date.now();
+  } else if (preset === "custom") {
+    const timeFrom = byId("log-time-from")?.value || "";
+    const timeTo = byId("log-time-to")?.value || "";
+    fromMs = timeFrom ? Date.parse(timeFrom) : null;
+    toMs = timeTo ? Date.parse(timeTo) : null;
+  }
   return appState.logs.filter((entry) => {
-    const haystack = `${entry.event || ""} ${entry.state || ""} ${entry.message || ""} ${entry.packet_type || ""} ${roleLabel(entry.role)}`.toLowerCase();
     if (role && entry.role !== role) return false;
     if (level && entry.level !== level) return false;
+    if (event && entry.event !== event) return false;
     if (errorOnly && !["ERROR", "ABORT", "WARN"].includes(entry.level)) return false;
-    if (search && !haystack.includes(search)) return false;
+    if (fromMs !== null || toMs !== null) {
+      const t = logTimeMs(entry);
+      if (fromMs !== null && t < fromMs) return false;
+      if (toMs !== null && t > toMs) return false;
+    }
     return true;
   });
 }
@@ -1740,11 +1889,54 @@ function renderLogTable(tbody, logs) {
 
 function renderLogs() {
   const logs = filteredLogs();
-  const logPage = paginateNewest(logs, appState.pagination.logs);
+  // 同步 log 事件下拉（按当前 logs 动态生成所有出现的事件名）
+  syncLogEventOptions();
+  const logPage = paginate(logs, appState.pagination.logs, appState.logFilters.sort);
   appState.pagination.logs = logPage.page;
   byId("log-count").textContent = t("logEntries", {count: logs.length});
   renderLogTable(byId("full-log-tbody"), logPage.rows.map((row) => row.item));
   renderPager(byId("log-pager"), "logs", logPage.page, logPage.totalPages, logPage.total);
+}
+
+/* 维护 flow_id 下拉：根据 appState.realPackets 收集所有出现过的 flow_id。
+   保留用户已选值（即使新数据里没有）；不存在时回退到 "全部流"。 */
+function syncPacketFilterOptions() {
+  const flowSel = byId("packet-flow-filter");
+  const stateSel = byId("packet-state-filter");
+  if (!flowSel || !stateSel) return;
+  const flows = new Set();
+  const states = new Set();
+  for (const p of appState.realPackets) {
+    if (p.flow_id) flows.add(p.flow_id);
+    if (p.state) states.add(p.state);
+  }
+  const sortedFlows = Array.from(flows).sort();
+  const sortedStates = Array.from(states).sort();
+  const curFlow = appState.packetFilters.flow;
+  const curState = appState.packetFilters.state;
+  flowSel.innerHTML = `<option value="">${escapeHtml(t("allFlows"))}</option>` +
+    sortedFlows.map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");
+  flowSel.value = (curFlow && sortedFlows.includes(curFlow)) ? curFlow : "";
+  appState.packetFilters.flow = flowSel.value;
+  stateSel.innerHTML = `<option value="">${escapeHtml(t("allStates"))}</option>` +
+    sortedStates.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  stateSel.value = (curState && sortedStates.includes(curState)) ? curState : "";
+  appState.packetFilters.state = stateSel.value;
+}
+
+/* 维护 log 事件下拉：根据 appState.logs 收集所有出现过的 event 名。 */
+function syncLogEventOptions() {
+  const sel = byId("log-event-filter");
+  if (!sel) return;
+  const events = new Set();
+  for (const e of appState.logs) {
+    if (e.event) events.add(e.event);
+  }
+  const sorted = Array.from(events).sort();
+  const cur = byId("log-event-filter")?.value || "";
+  sel.innerHTML = `<option value="">${escapeHtml(t("allEvents"))}</option>` +
+    sorted.map((ev) => `<option value="${escapeHtml(ev)}">${escapeHtml(ev)}</option>`).join("");
+  sel.value = (cur && sorted.includes(cur)) ? cur : "";
 }
 
 function renderTests() {
@@ -1968,23 +2160,156 @@ function wireEvents() {
     document.querySelector("[data-tab='logs']").click();
     byId("full-log-list").scrollIntoView({behavior: "smooth", block: "start"});
   });
-  ["role-filter", "level-filter", "search-filter", "error-only"].forEach((id) => {
+  // 日志过滤：role / level / event / 时间段 / 排序 / error-only
+  ["role-filter", "level-filter", "log-event-filter", "log-sort"].forEach((id) => {
     byId(id).addEventListener("input", () => {
       appState.pagination.logs = 1;
       render();
     });
+    byId(id).addEventListener("change", () => {
+      appState.pagination.logs = 1;
+      render();
+    });
   });
-  ["packet-search-filter", "packet-type-filter", "packet-direction-filter"].forEach((id) => {
-    const syncPacketFilters = () => {
-      appState.packetFilters.query = byId("packet-search-filter").value || "";
+  // 时间段用 change 触发（input 在 datetime-local 上是逐位变化，干扰太大）
+  ["log-time-from", "log-time-to"].forEach((id) => {
+    byId(id).addEventListener("change", () => {
+      appState.pagination.logs = 1;
+      render();
+    });
+  });
+  // 包过滤：type / direction / flow / state / 排序
+  ["packet-type-filter", "packet-direction-filter", "packet-flow-filter",
+   "packet-state-filter", "packet-sort"].forEach((id) => {
+    byId(id).addEventListener("change", () => {
       appState.packetFilters.type = byId("packet-type-filter").value || "";
       appState.packetFilters.direction = byId("packet-direction-filter").value || "";
+      appState.packetFilters.flow = byId("packet-flow-filter").value || "";
+      appState.packetFilters.state = byId("packet-state-filter").value || "";
+      appState.packetFilters.sort = byId("packet-sort").value || "newest";
       appState.pagination.packets = 1;
       renderProtocol();
-    };
-    byId(id).addEventListener("input", syncPacketFilters);
-    byId(id).addEventListener("change", syncPacketFilters);
+    });
   });
+  // 清空包过滤：把 5 个 select 复位、重置 appState、回第一页、重渲染
+  const packetClear = byId("packet-filter-clear");
+  if (packetClear) {
+    packetClear.addEventListener("click", () => {
+      appState.packetFilters.type = "";
+      appState.packetFilters.direction = "";
+      appState.packetFilters.flow = "";
+      appState.packetFilters.state = "";
+      appState.packetFilters.sort = "newest";
+      appState.pagination.packets = 1;
+      ["packet-type-filter", "packet-direction-filter", "packet-flow-filter",
+       "packet-state-filter", "packet-sort"].forEach((id) => {
+        const node = byId(id);
+        if (node) node.value = "";
+      });
+      // sort 复位为 "newest"（不是空）
+      byId("packet-sort").value = "newest";
+      renderProtocol();
+    });
+  }
+  // 清空日志过滤：6 个 select 复位、error-only 取消勾选、时间段留空、sort=newest、回第一页
+  const logClear = byId("log-filter-clear");
+  if (logClear) {
+    logClear.addEventListener("click", () => {
+      appState.logFilters.role = "";
+      appState.logFilters.level = "";
+      appState.logFilters.event = "";
+      appState.logFilters.timeRange = "all";
+      appState.logFilters.timeFrom = "";
+      appState.logFilters.timeTo = "";
+      appState.logFilters.sort = "newest";
+      appState.logFilters.errorOnly = false;
+      appState.pagination.logs = 1;
+      ["role-filter", "level-filter", "log-event-filter",
+       "log-time-from", "log-time-to", "log-sort"].forEach((id) => {
+        const node = byId(id);
+        if (node) node.value = "";
+      });
+      byId("log-sort").value = "newest";
+      // 分段控件回到"全部"
+      const segGroup = byId("log-time-range");
+      if (segGroup) {
+        segGroup.querySelectorAll(".seg-btn").forEach((btn) => {
+          btn.classList.toggle("is-active", btn.dataset.range === "all");
+        });
+      }
+      // 错误过滤分段控件回到"全部"
+      const errToggle = byId("log-error-only-toggle");
+      if (errToggle) {
+        errToggle.querySelectorAll(".seg-btn").forEach((btn) => {
+          btn.classList.toggle("is-active", btn.dataset.state === "all");
+        });
+      }
+      // 隐藏自定义时段行
+      const customRow = byId("log-custom-time-row");
+      if (customRow) customRow.classList.add("is-hidden");
+      render();
+    });
+  }
+  // 时间分段控件：5 段单选（全部 / 1m / 5m / 30m / 自定义）
+  // 选 "custom" 才显示 datetime 输入行；其他段隐藏输入并用预设规则
+  const segGroup = byId("log-time-range");
+  if (segGroup) {
+    segGroup.addEventListener("click", (event) => {
+      const btn = event.target.closest(".seg-btn");
+      if (!btn) return;
+      const range = btn.dataset.range;
+      if (!range) return;
+      // 切换 is-active
+      segGroup.querySelectorAll(".seg-btn").forEach((b) => {
+        b.classList.toggle("is-active", b === btn);
+      });
+      // 更新 state
+      appState.logFilters.timeRange = range;
+      // 显示 / 隐藏自定义行
+      const customRow = byId("log-custom-time-row");
+      if (customRow) {
+        customRow.classList.toggle("is-hidden", range !== "custom");
+      }
+      // 选"自定义"段时，若两个输入框都为空，自动填上 from=now-1h, to=now——
+      // 用户不需要先看空框再手动填"现在"
+      if (range === "custom") {
+        const fromEl = byId("log-time-from");
+        const toEl = byId("log-time-to");
+        const now = new Date();
+        const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const pad = (n) => String(n).padStart(2, "0");
+        const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        if (fromEl && !fromEl.value) fromEl.value = fmt(hourAgo);
+        if (toEl && !toEl.value) toEl.value = fmt(now);
+      }
+      appState.pagination.logs = 1;
+      render();
+    });
+  }
+  // 自定义时段行的 datetime 输入：change 即触发过滤
+  ["log-time-from", "log-time-to"].forEach((id) => {
+    byId(id).addEventListener("change", () => {
+      appState.pagination.logs = 1;
+      render();
+    });
+  });
+  // 错误过滤分段控件（全部 / 仅异常）
+  // 替代原来的 check-pill 设计：和 time-range 同样的胶囊组，视觉一致
+  const errToggle = byId("log-error-only-toggle");
+  if (errToggle) {
+    errToggle.addEventListener("click", (event) => {
+      const btn = event.target.closest(".seg-btn");
+      if (!btn) return;
+      const state = btn.dataset.state;
+      if (!state) return;
+      errToggle.querySelectorAll(".seg-btn").forEach((b) => {
+        b.classList.toggle("is-active", b === btn);
+      });
+      appState.logFilters.errorOnly = state === "errors";
+      appState.pagination.logs = 1;
+      render();
+    });
+  }
 
   document.addEventListener("click", (event) => {
     const passwordToggle = event.target.closest(".password-toggle");
@@ -2006,8 +2331,19 @@ function wireEvents() {
     const pageButton = event.target.closest("[data-page-target]");
     if (pageButton && !pageButton.disabled) {
       const target = pageButton.dataset.pageTarget;
-      const delta = Number(pageButton.dataset.pageDelta || 0);
-      appState.pagination[target] += delta;
+      const rawDelta = String(pageButton.dataset.pageDelta || "0");
+      if (rawDelta === "Infinity") {
+        /* 末页：跳到当前已知的最大页（由 renderPager 计算） */
+        const source = target === "packets" ? filteredPackets() : filteredLogs();
+        const totalPages = Math.max(1, Math.ceil(source.length / PAGE_SIZE));
+        appState.pagination[target] = totalPages;
+      } else if (rawDelta === "-Infinity") {
+        /* 首页 */
+        appState.pagination[target] = 1;
+      } else {
+        const delta = Number(rawDelta);
+        appState.pagination[target] += delta;
+      }
       render();
       return;
     }
@@ -2168,6 +2504,19 @@ async function boot() {
     console.warn(error);
     setLanguage("zh", false);
   }
+  // 日志时间区间：默认"全部"（不过滤）。重置时也是"全部"。
+  // 自定义输入框留空，隐藏自定义行；只有用户主动选"自定义"段才显示。
+  // 注意：datetime-local 输入框不再预填 2000-01-01 之类的"魔法日期"——
+  //   那是反直觉的"我看不出我选了 2000 年"的视觉陷阱。
+  const segGroup = byId("log-time-range");
+  if (segGroup && !segGroup.querySelector(".seg-btn.is-active")) {
+    segGroup.querySelectorAll(".seg-btn").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.range === "all");
+    });
+  }
+  // 自定义时段行默认隐藏
+  const customRow = byId("log-custom-time-row");
+  if (customRow) customRow.classList.add("is-hidden");
   // 主题：先读新版存储，再回退到旧版 lab/minimal/graphite 等映射
   let savedTheme = null;
   try { savedTheme = localStorage.getItem("udpLabThemeV2"); } catch (e) { /* noop */ }

@@ -300,24 +300,38 @@
                   <span class="hint" id="packet-count">0 个包</span>
                 </div>
               </div>
-              <div class="packet-filter-row">
-                <input id="packet-search-filter" placeholder="搜索类型、包 ID、方向或关键字" aria-label="搜索包">
-                <select id="packet-type-filter" aria-label="按包类型过滤">
-                  <option value="" data-i18n="allPacketTypes">全部包类型</option>
-                  <option>JOIN_REQ</option>
-                  <option>PASS_REQ</option>
-                  <option>PASS_RESP</option>
-                  <option>PASS_ACCEPT</option>
-                  <option>DATA</option>
-                  <option>TERMINATE</option>
-                  <option>REJECT</option>
-                </select>
-                <select id="packet-direction-filter" aria-label="按方向过滤">
-                  <option value="" data-i18n="allDirections">全部方向</option>
-                  <option value="Client -> Server" data-i18n="clientToServer">客户端到服务端</option>
-                  <option value="Server -> Client" data-i18n="serverToClient">服务端到客户端</option>
-                  <option value="Observed" data-i18n="observed">观察到</option>
-                </select>
+              <div class="control-bar packet-control-bar">
+                <div class="control-bar-section">
+                  <select id="packet-type-filter" class="filter-select" aria-label="包类型">
+                    <option value="" data-i18n="allPacketTypes">类型</option>
+                    <option>JOIN_REQ</option>
+                    <option>PASS_REQ</option>
+                    <option>PASS_RESP</option>
+                    <option>PASS_ACCEPT</option>
+                    <option>DATA</option>
+                    <option>TERMINATE</option>
+                    <option>REJECT</option>
+                  </select>
+                  <select id="packet-direction-filter" class="filter-select" aria-label="方向">
+                    <option value="" data-i18n="allDirections">方向</option>
+                    <option value="Client -> Server" data-i18n="clientToServer">C → S</option>
+                    <option value="Server -> Client" data-i18n="serverToClient">S → C</option>
+                  </select>
+                  <select id="packet-flow-filter" class="filter-select" aria-label="流">
+                    <option value="" data-i18n="allFlows">流</option>
+                  </select>
+                  <select id="packet-state-filter" class="filter-select" aria-label="状态">
+                    <option value="" data-i18n="allStates">状态</option>
+                  </select>
+                  <select id="packet-sort" class="filter-select" aria-label="排序">
+                    <option value="newest" data-i18n="sortNewest">最新优先</option>
+                    <option value="oldest" data-i18n="sortOldest">最旧优先</option>
+                  </select>
+                </div>
+                <div class="control-bar-divider" aria-hidden="true"></div>
+                <div class="control-bar-actions">
+                  <button id="packet-filter-clear" type="button" class="filter-action-btn" data-i18n="clearAll">清空</button>
+                </div>
               </div>
               <div class="table-wrap">
                 <table class="packet-table">
@@ -381,25 +395,59 @@
                 <h2 data-i18n="logFilters">日志过滤</h2>
                 <span class="hint" data-i18n="logFormatHint">JSON 行日志</span>
               </div>
-              <div class="filter-row">
-                <select id="role-filter" aria-label="Role filter">
-                  <option value="" data-i18n="allRoles">全部角色</option>
-                  <option value="server" data-i18n="serverRole">服务端</option>
-                  <option value="client" data-i18n="clientRole">客户端</option>
-                  <option value="control" data-i18n="controlRole">控制端</option>
-                </select>
-                <select id="level-filter" aria-label="Level filter">
-                  <option value="" data-i18n="allLevels">全部级别</option>
-                  <option>INFO</option>
-                  <option>AUTH</option>
-                  <option>DATA</option>
-                  <option>WARN</option>
-                  <option>ERROR</option>
-                  <option>SUCCESS</option>
-                  <option>ABORT</option>
-                </select>
-                <input id="search-filter" placeholder="搜索事件、状态、消息">
-                <label class="check-label"><input id="error-only" type="checkbox"><span data-i18n="errorsOnly">只看异常</span></label>
+              <div class="control-bar log-control-bar">
+                <div class="control-bar-section">
+                  <select id="role-filter" class="filter-select" aria-label="角色">
+                    <option value="" data-i18n="allRoles">角色</option>
+                    <option value="server" data-i18n="serverRole">server</option>
+                    <option value="client" data-i18n="clientRole">client</option>
+                    <option value="control" data-i18n="controlRole">control</option>
+                  </select>
+                  <select id="level-filter" class="filter-select" aria-label="级别">
+                    <option value="" data-i18n="allLevels">级别</option>
+                    <option>INFO</option>
+                    <option>AUTH</option>
+                    <option>DATA</option>
+                    <option>WARN</option>
+                    <option>ERROR</option>
+                    <option>SUCCESS</option>
+                    <option>ABORT</option>
+                  </select>
+                  <select id="log-event-filter" class="filter-select" aria-label="事件">
+                    <option value="" data-i18n="allEvents">事件</option>
+                  </select>
+                </div>
+                <div class="control-bar-divider" aria-hidden="true"></div>
+                <div class="control-bar-section time-range-section">
+                  <span class="section-label" data-i18n="timeRange">时间范围</span>
+                  <div class="segmented-control" id="log-time-range" role="radiogroup" aria-label="时间范围">
+                    <button type="button" class="seg-btn is-active" data-range="all" data-i18n="rangeAll">全部</button>
+                    <button type="button" class="seg-btn" data-range="1m" data-i18n="range1m">1m</button>
+                    <button type="button" class="seg-btn" data-range="5m" data-i18n="range5m">5m</button>
+                    <button type="button" class="seg-btn" data-range="30m" data-i18n="range30m">30m</button>
+                    <button type="button" class="seg-btn" data-range="custom" data-i18n="rangeCustom">自定义</button>
+                  </div>
+                </div>
+                <div class="control-bar-divider" aria-hidden="true"></div>
+                <div class="control-bar-section">
+                  <select id="log-sort" class="filter-select" aria-label="排序">
+                    <option value="newest" data-i18n="sortNewest">最新优先</option>
+                    <option value="oldest" data-i18n="sortOldest">最旧优先</option>
+                  </select>
+                  <div class="segmented-control error-toggle" id="log-error-only-toggle" role="radiogroup" aria-label="错误过滤">
+                    <button type="button" class="seg-btn is-active" data-state="all" data-i18n="errorStateAll">全部</button>
+                    <button type="button" class="seg-btn" data-state="errors" data-i18n="errorsOnly">仅异常</button>
+                  </div>
+                </div>
+                <div class="control-bar-actions">
+                  <button id="log-filter-clear" type="button" class="filter-action-btn" data-i18n="clearAll">清空</button>
+                </div>
+                <div class="control-bar-custom-row is-hidden" id="log-custom-time-row">
+                  <span class="custom-row-label" data-i18n="customRange">自定义时段</span>
+                  <input id="log-time-from" type="datetime-local" class="filter-time" aria-label="起始时间" title="起始时间">
+                  <span class="time-range-sep" aria-hidden="true">→</span>
+                  <input id="log-time-to" type="datetime-local" class="filter-time" aria-label="结束时间" title="结束时间">
+                </div>
               </div>
             </section>
             <section class="panel log-panel">

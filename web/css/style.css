@@ -186,6 +186,19 @@ h3 {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+
+/* neumorph / nordic / matcha：装饰光斑在屏幕底/四角，saturate(1.24) 会放大
+   任何与主色色相不同的方向，导致面板底/边出现淡红色调。
+   这 3 个主题关掉 saturate、用普通 blur 即可保持纯净的米/灰/冷雾底色。*/
+:root[data-theme="neumorph"] .control-section,
+:root[data-theme="neumorph"] .panel,
+:root[data-theme="nordic"] .control-section,
+:root[data-theme="nordic"] .panel,
+:root[data-theme="matcha"] .control-section,
+:root[data-theme="matcha"] .panel {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
 :root[data-theme="metal"] .control-section,
 :root[data-theme="metal"] .panel {
   backdrop-filter: none;
@@ -741,7 +754,31 @@ select {
   background: var(--glass-strong);
   box-shadow: var(--soft-shadow-inset-sm, none);
   font-family: inherit;
+  /* accent-color 控制：原生密码输入的小圆点、checkbox / radio 的勾选色、
+     datetime-local picker 的滚轮高亮、日期间隔线等。
+     用主题主色，避免在不同主题下出现默认的"红"色焦点。 */
+  accent-color: var(--primary);
   transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+/* 覆盖浏览器对已保存密码的自动填充高亮（Chrome/Safari 会加 -webkit-box-shadow 的浅黄/粉底色）——
+   用主题 --surface 色填满 inset 1000px，把自动填充色"挤"出可视范围。 */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+input:-internal-autofill-selected {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset !important;
+  -webkit-text-fill-color: var(--ink) !important;
+  caret-color: var(--ink) !important;
+  background-color: var(--surface) !important;
+}
+
+/* 关闭无效输入的浏览器默认红框。 */
+input:invalid,
+input:-moz-ui-invalid {
+  box-shadow: none;
+  outline: none;
 }
 
 :root[data-theme="neumorph"] input,
@@ -1140,6 +1177,388 @@ select:focus-visible {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+/* -----------------------------------------------------------------------------
+   控制条（filter row）—— 仪器面板风格
+   整条作为一个视觉单元：浅色容器背景 + 圆角边框；内部分若干"段"，用细分隔线划分。
+   控件在段内通过 flex: 1 1 min 自由伸缩，确保面板宽度变化（侧边栏收起/展开）时
+   所有控件依旧完整在一行内可见，**永不出现横向滚动条**。
+   ----------------------------------------------------------------------------- */
+.control-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--control-radius);
+  background: color-mix(in oklch, var(--surface-strong) 55%, var(--surface));
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+}
+
+/* 3 个浅底主题（neumorph / nordic / matcha）：装饰光斑 + saturate 会让控制条 / 密码区
+   在视觉上"染"上一层与主色不一致的暖色（最常见是淡红/淡粉）。强制用不透明
+   的 surface 色 + 移除透明叠加，确保容器的底色和主题完全一致。 */
+:root[data-theme="neumorph"] .control-bar,
+:root[data-theme="nordic"] .control-bar,
+:root[data-theme="matcha"] .control-bar {
+  background: var(--surface);
+  border-color: var(--line);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--soft-shadow-sm, none);
+}
+:root[data-theme="neumorph"] .password-mode-panel,
+:root[data-theme="nordic"] .password-mode-panel,
+:root[data-theme="matcha"] .password-mode-panel {
+  background: var(--surface);
+  border-color: var(--line);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--soft-shadow-sm, none);
+}
+/* 密码区底下有时候会看到一条淡红"溢出"——因为 .panel 的 box-shadow 是 var(--soft-shadow)
+   里有 inset 高光。3 主题的 --soft-shadow 是双向投影，本身不该是红色，但当容器
+   不够"实"时装饰光斑透过会变成"暖色高光"。直接把容器的 background-color 强制设成
+   var(--surface) 不透明即可。 */
+
+.control-bar-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.control-bar-section > .filter-select {
+  flex: 1 1 80px;
+  min-width: 80px;
+  max-width: 200px;
+}
+
+.control-bar-divider {
+  width: 1px;
+  align-self: stretch;
+  background: color-mix(in oklch, var(--line) 90%, transparent);
+  opacity: 0.6;
+  margin: 2px 2px;
+}
+
+.control-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* -----------------------------------------------------------------------------
+   时间分段控件：5 段按钮并排成一个圆角胶囊组；当前激活的段用主色填充。
+   视觉参考：iOS / macOS 原生 segmented control。
+   ----------------------------------------------------------------------------- */
+.time-range-section {
+  flex: 1 1 280px;
+  min-width: 240px;
+  max-width: 380px;
+  gap: 8px;
+}
+
+.section-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex: 0 0 auto;
+}
+
+.segmented-control {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--surface);
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+  padding: 2px;
+  gap: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.segmented-control .seg-btn {
+  flex: 1 1 auto;
+  border: none;
+  background: transparent;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background-color 180ms ease, color 180ms ease, transform 80ms ease;
+  white-space: nowrap;
+  text-align: center;
+  min-width: 0;
+}
+
+.segmented-control .seg-btn:hover:not(.is-active) {
+  color: var(--ink);
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+}
+
+.segmented-control .seg-btn.is-active {
+  background: var(--primary);
+  color: var(--text-on-primary, #fff);
+  box-shadow: 0 1px 2px color-mix(in oklch, var(--primary) 30%, transparent);
+}
+
+.segmented-control .seg-btn:active {
+  transform: scale(0.97);
+}
+
+:root[data-theme="neumorph"] .segmented-control {
+  background: var(--surface);
+  border-color: transparent;
+  box-shadow: var(--soft-shadow-sm);
+}
+:root[data-theme="neumorph"] .segmented-control .seg-btn.is-active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 4px color-mix(in oklch, var(--primary) 20%, transparent);
+}
+:root[data-theme="cyber"] .segmented-control .seg-btn {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.72rem;
+}
+:root[data-theme="metal"] .segmented-control {
+  background: linear-gradient(180deg, #2A2A2A 0%, #1A1A1A 100%);
+  border-color: #6B6B6B;
+}
+:root[data-theme="metal"] .segmented-control .seg-btn.is-active {
+  background: linear-gradient(180deg, #D4B25F 0%, #B89A4F 100%);
+  color: #1A1A1A;
+}
+
+/* 自定义时段行：默认隐藏，仅当选择"自定义"预设时显示。 */
+.control-bar-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-basis: 100%;
+  padding: 4px 4px 0;
+  margin-top: 2px;
+  border-top: 1px dashed color-mix(in oklch, var(--line) 70%, transparent);
+}
+.control-bar-custom-row.is-hidden {
+  display: none;
+}
+.custom-row-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex: 0 0 auto;
+}
+.time-range-sep {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.filter-action-btn {
+  min-height: 30px;
+  padding: 0 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+.filter-action-btn:hover {
+  background: var(--surface-strong);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: var(--soft-shadow-sm, none);
+}
+.filter-action-btn:active {
+  transform: scale(0.98);
+}
+/* 旧版 hover 用 --danger，会让"清空"在 neumorph/nordic 下变成粉红、在 matcha 下变成橙红。
+   改为 hover 用 primary 蓝/绿——清空仍然是"可识别的次要操作"，但不再带警告/危险色。 */
+
+/* 错误过滤分段控件：复用 .segmented-control 的样式；
+   仅异常段激活时颜色用 primary（不发红），保持整体调性一致。 */
+.error-toggle {
+  flex: 0 0 auto;
+  min-width: 110px;
+  max-width: 140px;
+}
+.error-toggle .seg-btn.is-active {
+  background: var(--primary);
+  color: var(--text-on-primary, #fff);
+}
+
+/* 兼容旧 markup（如果将来某处还在用 .packet-filter-row / .filter-row） */
+.packet-filter-row.compact,
+.filter-row.compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.filter-select {
+  min-height: 28px;
+  padding: 2px 6px;
+  font-size: 0.78rem;
+  border-radius: var(--control-radius);
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  flex: 0 0 auto;
+  max-width: 180px;
+}
+
+.filter-time {
+  min-height: 28px;
+  padding: 2px 6px;
+  font-size: 0.78rem;
+  border-radius: var(--control-radius);
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  flex: 0 0 auto;
+  min-width: 130px;
+  max-width: 170px;
+}
+
+.small-button {
+  min-height: 28px;
+  padding: 0 9px;
+  font-size: 0.78rem;
+}
+
+.time-range-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+input[type="datetime-local"] {
+  min-height: 30px;
+  padding: 3px 8px;
+  border-radius: var(--control-radius);
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.82rem;
+  /* accent-color: 控制浏览器原生 datetime-local picker 内部选中色（滚轮高亮、日期间隔线等）
+     用主题主色，避免在不同主题下出现默认的蓝/红。*/
+  accent-color: var(--primary);
+  color-scheme: light dark;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+input[type="datetime-local"]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 22%, transparent);
+}
+input[type="datetime-local"]:hover:not(:focus) {
+  border-color: color-mix(in oklch, var(--primary) 50%, var(--line));
+}
+
+/* 主题特定的 datetime-local 外观——消除浏览器默认的"白底深字 + 红/蓝 accent"在主题下突兀 */
+:root[data-theme="neumorph"] input[type="datetime-local"] {
+  background: var(--surface);
+  border-color: transparent;
+  box-shadow: var(--soft-shadow-sm);
+}
+:root[data-theme="neumorph"] input[type="datetime-local"]:focus {
+  box-shadow: var(--soft-shadow-inset-sm), 0 0 0 3px color-mix(in oklch, var(--primary) 30%, transparent);
+}
+:root[data-theme="neumorph"] input[type="datetime-local"]:hover:not(:focus) {
+  box-shadow: var(--soft-shadow-sm);
+}
+
+:root[data-theme="matcha"] input[type="datetime-local"],
+:root[data-theme="nordic"] input[type="datetime-local"] {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+:root[data-theme="matcha"] input[type="datetime-local"]:focus,
+:root[data-theme="nordic"] input[type="datetime-local"]:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 18%, transparent);
+}
+
+:root[data-theme="metal"] input[type="datetime-local"] {
+  background: linear-gradient(180deg, #2A2A2A 0%, #1A1A1A 100%);
+  border-color: #6B6B6B;
+  color: #D4B25F;
+  accent-color: #D4B25F;
+}
+:root[data-theme="metal"] input[type="datetime-local"]:focus {
+  border-color: #D4B25F;
+  box-shadow: 0 0 0 3px rgba(212, 178, 95, 0.25);
+}
+
+:root[data-theme="cyber"] input[type="datetime-local"] {
+  background: transparent;
+  border-color: var(--primary);
+  color: var(--primary);
+  accent-color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 0.78rem;
+}
+
+:root[data-theme="aurora"] input[type="datetime-local"] {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(91, 255, 181, 0.30);
+  color: var(--ink);
+  accent-color: var(--primary);
+}
+:root[data-theme="aurora"] input[type="datetime-local"]:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 12px color-mix(in oklch, var(--primary) 40%, transparent);
+}
+
+:root[data-theme="cartoon"] input[type="datetime-local"],
+:root[data-theme="sticker"] input[type="datetime-local"] {
+  border: 2px solid var(--line);
+  background: #FFFEF5;
+  color: var(--ink);
+  accent-color: var(--primary);
+  font-weight: 600;
+}
+:root[data-theme="cartoon"] input[type="datetime-local"]:focus,
+:root[data-theme="sticker"] input[type="datetime-local"]:focus {
+  border-color: var(--primary);
+  box-shadow: 4px 4px 0 var(--line);
+}
+
+:root[data-theme="liquid"] input[type="datetime-local"] {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px);
+  border-color: color-mix(in oklch, var(--primary) 40%, transparent);
+  color: var(--ink);
+  accent-color: var(--primary);
+}
+
+:root[data-theme="neumorph"] .filter-select,
+:root[data-theme="neumorph"] .filter-time {
+  background: var(--surface);
+  border-color: transparent;
+  box-shadow: var(--soft-shadow-sm);
 }
 
 .sidebar-form .button-row {
@@ -1984,6 +2403,86 @@ select:focus-visible {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* DATA 折叠 / 展开条：full-width bar（与 sequence-view 等宽），与 packet row 视觉上明显不同。
+   折叠态：1 个 bar 替代整段被折叠数据，bar 里含 ⋯⋯⋯、DATA #first — DATA #last、省略 N 个、点击展开。
+   展开态：2 个 bar，分别在 [首 3 个之后] 和 [末 1 个之前] 各打一个标记，含 ⋯⋯⋯、DATA #id 之前被折叠、点击折叠。
+   bar 是 sequence-view 整宽（无 client/server endpoint），点击任一 bar 都触发同一个 toggle。 */
+.fold-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 0;
+  margin: 2px 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--ink);
+}
+
+.fold-bar:hover .fold-bar-text {
+  background: color-mix(in oklch, var(--stage-data) 18%, var(--surface));
+  border-color: var(--stage-data);
+}
+
+.fold-bar:active {
+  transform: scale(0.998);
+}
+
+.fold-bar .fold-bar-line {
+  flex: 1;
+  height: 1px;
+  background: color-mix(in oklch, var(--line) 80%, transparent);
+  opacity: 0.7;
+}
+
+.fold-bar .fold-bar-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklch, var(--stage-data) 50%, var(--line));
+  background: color-mix(in oklch, var(--stage-data) 10%, var(--surface));
+  font-size: 0.82rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.fold-bar .fold-bar-dots {
+  color: color-mix(in oklch, var(--stage-data) 70%, var(--ink));
+  letter-spacing: 2px;
+  font-weight: 800;
+}
+
+.fold-bar .fold-bar-range,
+.fold-bar .fold-bar-marker {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.fold-bar .fold-bar-count {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.fold-bar .fold-bar-action {
+  color: var(--stage-data);
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+:root[data-theme="cyber"] .fold-bar .fold-bar-text {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+:root[data-theme="metal"] .fold-bar .fold-bar-text {
+  background: linear-gradient(180deg, #2A2A2A 0%, #1A1A1A 100%);
+  border-color: #6B6B6B;
 }
 
 .sequence-gap .endpoint {

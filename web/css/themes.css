@@ -30,7 +30,7 @@
   --stage-final: #B56A5A;
   --success: #5C8A6A;
   --warning: #C49A4A;
-  --danger: #B55A5A;
+  --danger: #A86666;  /* 比 #B55A5A 偏灰偏冷，避免在浅米色底上"跳"出粉红感 */
   --code-bg: #D6DBE3;
   --radius: 22px;
   --control-radius: 14px;
@@ -56,8 +56,8 @@
   --accent-1: #5A6A85;
   --accent-2: #7A8AB5;
   --stage-color: #5A6A85;
-  --decor-blob-1: rgba(122, 138, 181, 0.18);
-  --decor-blob-2: rgba(180, 200, 220, 0.15);
+  --decor-blob-1: rgba(122, 138, 181, 0.12);
+  --decor-blob-2: rgba(160, 180, 200, 0.10);
   --glow-primary: none;
   --glow-accent: none;
   --text-on-primary: #FFFFFF;
@@ -336,7 +336,7 @@
   --stage-final: #B5C4CE;
   --success: #5C8A6A;
   --warning: #C49A4A;
-  --danger: #B55A5A;
+  --danger: #8B6868;  /* 冷雾主题：偏灰偏冷，避免在浅灰底上像粉红警告色 */
   --code-bg: #DDE3E7;
   --radius: 14px;
   --control-radius: 10px;
@@ -357,8 +357,8 @@
   --accent-1: #3E5C76;
   --accent-2: #7A99B5;
   --stage-color: #3E5C76;
-  --decor-blob-1: rgba(62, 92, 118, 0.10);
-  --decor-blob-2: rgba(122, 153, 181, 0.10);
+  --decor-blob-1: rgba(62, 92, 118, 0.08);
+  --decor-blob-2: rgba(110, 140, 170, 0.07);
   --glow-primary: none;
   --glow-accent: none;
   --text-on-primary: #FFFFFF;
@@ -524,7 +524,7 @@
   --stage-final: #B84418;
   --success: #7A9059;
   --warning: #C49A4A;
-  --danger: #B84418;
+  --danger: #8B5A3A;  /* 抹茶：朱土色调去饱和度，避免在米黄底上跳出"红字警告"感 */
   --code-bg: #E0DFC8;
   --radius: 16px;
   --control-radius: 12px;
@@ -545,8 +545,8 @@
   --accent-1: #7A9059;
   --accent-2: #A8B57A;
   --stage-color: #7A9059;
-  --decor-blob-1: rgba(122, 144, 89, 0.18);
-  --decor-blob-2: rgba(168, 181, 122, 0.18);
+  --decor-blob-1: rgba(122, 144, 89, 0.12);
+  --decor-blob-2: rgba(150, 165, 110, 0.10);
   --glow-primary: none;
   --glow-accent: none;
   --text-on-primary: #FFFFFF;
