@@ -1,0 +1,23 @@
+{
+  "id": "tcp-basic",
+  "name": "TCP Basic",
+  "version": "2",
+  "transport": "tcp",
+  "summary": "使用真实 TCP 连接和应用层 framing，演示字节流中的认证、数据与关闭。",
+  "transferView": "file",
+  "sequenceStages": ["JOIN_REQ", "PASS_REQ", "PASS_RESP", "PASS_ACCEPT", "DATA", "TERMINATE"],
+  "packetTypes": [
+    {"code": 1, "name": "JOIN_REQ"},
+    {"code": 2, "name": "PASS_REQ"},
+    {"code": 3, "name": "PASS_RESP"},
+    {"code": 4, "name": "PASS_ACCEPT"},
+    {"code": 5, "name": "DATA"},
+    {"code": 6, "name": "TERMINATE"},
+    {"code": 7, "name": "REJECT"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "packet_code",
+    "stream_offset", "payload_length", "bytes", "packet_uid", "wire_hex"
+  ]
+}

@@ -655,6 +655,46 @@ h3 {
   min-height: 0;
 }
 
+.protocol-summary-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.protocol-summary-copy {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.protocol-stage-line {
+  display: grid;
+  gap: 6px;
+}
+
+.protocol-stage-line code,
+.protocol-compare-card code {
+  display: block;
+  padding: 10px 12px;
+  border-radius: var(--control-radius);
+  background: var(--surface-strong);
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.protocol-compare-row {
+  display: grid;
+  gap: 10px;
+}
+
+.protocol-compare-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--control-radius);
+  background: color-mix(in oklch, var(--primary) 8%, var(--surface));
+  border: var(--border-width, 1px) var(--border-style, solid) color-mix(in oklch, var(--primary) 30%, var(--line));
+}
+
 .recent-panel,
 .digest-panel-wide,
 .packet-table-panel,
@@ -3165,6 +3205,32 @@ tbody tr:last-child td {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(22px, 1fr));
   gap: 5px;
+}
+
+.fragment-matrix.protocol-event-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr;
+}
+
+.protocol-event-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--control-radius);
+  background: var(--surface-strong);
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+}
+
+.protocol-event-row div {
+  min-width: 0;
+}
+
+.protocol-event-row .hint {
+  display: block;
+  margin-top: 2px;
 }
 /* 空态：切到 block 布局，否则 <p> 会被 grid item 约束成 22px 宽，
    中英文都按 1 字 1 行换行（"传输尚未开始" 会变成每行一个字）。*/

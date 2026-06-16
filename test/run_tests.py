@@ -26,11 +26,19 @@ def free_udp_port():
     return port
 
 
-def run_cmd(args, timeout=8):
+def free_tcp_port():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    return port
+
+
+def run_cmd(args, timeout=8, env=None):
     return subprocess.run(
         args,
         cwd=ROOT,
-        env=ENV,
+        env=env or ENV,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -39,15 +47,19 @@ def run_cmd(args, timeout=8):
     )
 
 
-def start_server(port, password, input_file):
+def start_process(args, env=None):
     return subprocess.Popen(
-        ["./bin/server", str(port), password, str(input_file)],
+        args,
         cwd=ROOT,
-        env=ENV,
+        env=env or ENV,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+
+
+def start_server(port, password, input_file, env=None):
+    return start_process(["./bin/server", str(port), password, str(input_file)], env=env)
 
 
 def wait_for_server_start(port, timeout=2.5):
@@ -106,13 +118,16 @@ def result(case_id, name, passed, message, **extra):
     return item
 
 
-def run_pair(case_id, name, input_file, password, attempts, expect_ok=True):
+def run_pair(case_id, name, input_file, password, attempts, expect_ok=True, env_overrides=None):
     port = free_udp_port()
     output = ROOT / "output" / f"{case_id}.out"
     output.unlink(missing_ok=True)
-    server = start_server(port, password, input_file)
+    pair_env = ENV.copy()
+    if env_overrides:
+        pair_env.update(env_overrides)
+    server = start_server(port, password, input_file, env=pair_env)
     wait_for_server_start(port)
-    client = run_cmd(["./bin/client", "127.0.0.1", str(port), *attempts, str(output)], timeout=8)
+    client = run_cmd(["./bin/client", "127.0.0.1", str(port), *attempts, str(output)], timeout=8, env=pair_env)
     server_rc, server_out, server_err = collect_process(server, timeout=8)
     client_ok = "OK" in client.stdout
     server_ok = "OK" in server_out
@@ -135,6 +150,80 @@ def run_pair(case_id, name, input_file, password, attempts, expect_ok=True):
         server_stdout=server_out.strip(),
         server_stderr=server_err.strip(),
     )
+
+
+def run_demo_pair(case_id, name, server_bin, client_bin, input_file, output_file, port_kind,
+                  env_overrides=None, attempts=None, expect_ok=True, verify_output=False,
+                  expect_client_status=None, expect_server_status=None, timeout=8,
+                  require_log_text=None):
+    port = free_tcp_port() if port_kind == "tcp" else free_udp_port()
+    pair_env = ENV.copy()
+    pair_env.update(env_overrides or {})
+    output_path = ROOT / "output" / output_file
+    output_path.unlink(missing_ok=True)
+    server = start_process([server_bin, str(port), "secret", str(input_file)], env=pair_env)
+    wait_for_server_start(port)
+    client_args = [client_bin, "127.0.0.1", str(port)]
+    if attempts:
+      client_args.extend(attempts)
+      client_args.append(str(output_path))
+    else:
+      client_args.extend(["secret", "x", "x", str(output_path)])
+    client = run_cmd(client_args, timeout=timeout, env=pair_env)
+    server_rc, server_out, server_err = collect_process(server, timeout=timeout)
+    server_stdout = server_out.strip()
+    client_stdout = client.stdout.strip()
+    client_ok = "OK" in client_stdout
+    server_ok = "OK" in server_stdout
+    client_abort = "ABORT" in client_stdout
+    server_abort = "ABORT" in server_stdout
+    file_ok = True
+    if verify_output:
+        file_ok = output_path.exists() and input_file.read_bytes() == output_path.read_bytes()
+    if expect_ok:
+        passed = client.returncode == 0 and server_rc == 0 and client_ok and server_ok and file_ok
+    else:
+        passed = client.returncode != 0 and server_rc != 0 and client_abort and server_abort
+    if expect_client_status is not None:
+        passed = passed and expect_client_status in client_stdout
+    if expect_server_status is not None:
+        passed = passed and expect_server_status in server_stdout
+    if require_log_text:
+        log_text = (ROOT / "logs" / "server.jsonl").read_text(encoding="utf-8", errors="ignore")
+        passed = passed and require_log_text in log_text
+    message = "demo pair completed" if passed else "demo pair failed"
+    return result(
+        case_id,
+        name,
+        passed,
+        message,
+        client_stdout=client_stdout,
+        client_stderr=client.stderr.strip(),
+        server_stdout=server_stdout,
+        server_stderr=server_err.strip(),
+    )
+
+
+def test_reliable_pair(case_id, name, input_file, env_overrides=None):
+    log_path = ROOT / "logs" / "server.jsonl"
+    before = log_path.read_text(encoding="utf-8", errors="ignore") if log_path.exists() else ""
+    item = run_pair(
+        case_id,
+        name,
+        input_file,
+        "secret",
+        ["secret", "x", "x"],
+        True,
+        env_overrides={"UDP_SECURE_PROTOCOL": "udp-reliable", **(env_overrides or {})},
+    )
+    after = log_path.read_text(encoding="utf-8", errors="ignore") if log_path.exists() else ""
+    delta = after[len(before):]
+    item["has_ack"] = '"packet_type":"ACK"' in after or '"packet_type":"ACK"' in delta
+    item["has_retransmit"] = "RETRANSMIT_DATA" in after or "SIMULATED_DROP" in after
+    if not item["has_ack"]:
+        item["pass"] = False
+        item["message"] = f"{item['message']}; missing ACK logs"
+    return item
 
 
 def test_missing_input():
@@ -257,6 +346,245 @@ def run_all():
     tests.append(run_pair("third_password_ok", "第三次密码正确", small, "secret", ["wrong", "wrong", "secret"], True))
     tests.append(run_pair("three_passwords_wrong", "三次密码全部错误", small, "secret", ["bad1", "bad2", "bad3"], False))
     tests.append(run_pair("big_file_transfer", "大文件多分片传输", big, "secret", ["secret", "x", "x"], True))
+    tests.append(test_reliable_pair("reliable_basic", "Reliable UDP 正常传输", big))
+    tests.append(test_reliable_pair(
+        "reliable_loss_recovery",
+        "Reliable UDP 丢包后恢复",
+        big,
+        {"UDP_SECURE_RELIABLE_LOSS_IDS": "1,3", "UDP_SECURE_RELIABLE_TIMEOUT_MS": "180"},
+    ))
+    tests.append(test_reliable_pair(
+        "reliable_reorder_recovery",
+        "Reliable UDP 乱序后恢复",
+        big,
+        {"UDP_SECURE_RELIABLE_REORDER_IDS": "1,3"},
+    ))
+    tests.append(test_reliable_pair(
+        "reliable_duplicate_recovery",
+        "Reliable UDP 重复包后恢复",
+        big,
+        {"UDP_SECURE_RELIABLE_DUP_IDS": "2,4"},
+    ))
+    tests.append(run_demo_pair(
+        "tcp_basic_normal",
+        "TCP Basic 正常传输",
+        "./bin/tcp_server",
+        "./bin/tcp_client",
+        small,
+        "tcp-basic.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "tcp-basic", "UDP_SECURE_SCENARIO": "normal"},
+        verify_output=True,
+    ))
+    tests.append(run_demo_pair(
+        "tcp_fragmentation",
+        "TCP Basic 半包 / 粘包",
+        "./bin/tcp_server",
+        "./bin/tcp_client",
+        small,
+        "tcp-fragment.out",
+        "tcp",
+        env_overrides={
+            "UDP_SECURE_PROTOCOL": "tcp-basic",
+            "UDP_SECURE_SCENARIO": "stream-fragmentation",
+            "UDP_SECURE_STREAM_FRAGMENTATION": "1",
+        },
+        verify_output=True,
+    ))
+    tests.append(run_demo_pair(
+        "tcp_mid_close",
+        "TCP Basic 中途断连",
+        "./bin/tcp_server",
+        "./bin/tcp_client",
+        small,
+        "tcp-mid-close.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "tcp-basic", "UDP_SECURE_SCENARIO": "connection-close-mid-transfer"},
+        expect_ok=False,
+    ))
+    tests.append(run_demo_pair(
+        "tls_like_normal",
+        "TLS-like 正常握手与传输",
+        "./bin/tls_server",
+        "./bin/tls_client",
+        small,
+        "tls-like.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "tls-like", "UDP_SECURE_SCENARIO": "normal"},
+        verify_output=True,
+    ))
+    tests.append(run_demo_pair(
+        "tls_like_bad_finished",
+        "TLS-like 篡改 Finished",
+        "./bin/tls_server",
+        "./bin/tls_client",
+        small,
+        "tls-like-finished.out",
+        "tcp",
+        env_overrides={
+            "UDP_SECURE_PROTOCOL": "tls-like",
+            "UDP_SECURE_SCENARIO": "tampered-finished",
+            "UDP_SECURE_TAMPER_FINISHED": "1",
+        },
+        expect_ok=False,
+    ))
+    tests.append(run_demo_pair(
+        "tls_like_bad_app_data",
+        "TLS-like 篡改 APP_DATA",
+        "./bin/tls_server",
+        "./bin/tls_client",
+        small,
+        "tls-like-appdata.out",
+        "tcp",
+        env_overrides={
+            "UDP_SECURE_PROTOCOL": "tls-like",
+            "UDP_SECURE_SCENARIO": "tampered-app-data",
+            "UDP_SECURE_TAMPER_APP_DATA": "1",
+        },
+        expect_ok=False,
+    ))
+    tests.append(run_demo_pair(
+        "tls_like_replay",
+        "TLS-like Replay 检测",
+        "./bin/tls_server",
+        "./bin/tls_client",
+        small,
+        "tls-like-replay.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "tls-like", "UDP_SECURE_SCENARIO": "replay"},
+        expect_ok=False,
+    ))
+    tests.append(run_demo_pair(
+        "http_basic_normal",
+        "HTTP Basic 正常请求链路",
+        "./bin/http_demo_server",
+        "./bin/http_demo_client",
+        small,
+        "http-basic.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "http-basic", "UDP_SECURE_SCENARIO": "normal"},
+    ))
+    tests.append(run_demo_pair(
+        "http_basic_bad_auth",
+        "HTTP Basic 错误密码",
+        "./bin/http_demo_server",
+        "./bin/http_demo_client",
+        small,
+        "http-bad-auth.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "http-basic", "UDP_SECURE_SCENARIO": "bad-auth"},
+        expect_ok=False,
+    ))
+    tests.append(run_demo_pair(
+        "http_basic_payload_large",
+        "HTTP Basic 过大请求体",
+        "./bin/http_demo_server",
+        "./bin/http_demo_client",
+        small,
+        "http-payload-large.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "http-basic", "UDP_SECURE_SCENARIO": "payload-too-large"},
+        expect_ok=False,
+    ))
+    tests.append(run_demo_pair(
+        "http_basic_bad_method",
+        "HTTP Basic 错误方法",
+        "./bin/http_demo_server",
+        "./bin/http_demo_client",
+        small,
+        "http-bad-method.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "http-basic", "UDP_SECURE_SCENARIO": "bad-method"},
+        expect_ok=False,
+    ))
+    tests.append(run_demo_pair(
+        "websocket_basic_normal",
+        "WebSocket Basic 正常升级与消息",
+        "./bin/websocket_demo_server",
+        "./bin/websocket_demo_client",
+        small,
+        "websocket-basic.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "websocket-basic", "UDP_SECURE_SCENARIO": "normal"},
+    ))
+    tests.append(run_demo_pair(
+        "websocket_bad_upgrade",
+        "WebSocket Basic 错误 Upgrade",
+        "./bin/websocket_demo_server",
+        "./bin/websocket_demo_client",
+        small,
+        "websocket-bad-upgrade.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "websocket-basic", "UDP_SECURE_SCENARIO": "bad-upgrade"},
+        expect_ok=False,
+    ))
+    tests.append(run_demo_pair(
+        "websocket_ping_timeout",
+        "WebSocket Basic Ping Timeout",
+        "./bin/websocket_demo_server",
+        "./bin/websocket_demo_client",
+        small,
+        "websocket-ping-timeout.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "websocket-basic", "UDP_SECURE_SCENARIO": "ping-timeout"},
+        expect_ok=False,
+    ))
+    tests.append(run_demo_pair(
+        "websocket_unexpected_close",
+        "WebSocket Basic Unexpected Close",
+        "./bin/websocket_demo_server",
+        "./bin/websocket_demo_client",
+        small,
+        "websocket-unexpected-close.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "websocket-basic", "UDP_SECURE_SCENARIO": "unexpected-close"},
+        expect_ok=False,
+    ))
+    tests.append(run_demo_pair(
+        "quic_like_normal",
+        "QUIC-like 正常单流",
+        "./bin/quic_demo_server",
+        "./bin/quic_demo_client",
+        small,
+        "quic-like.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "quic-like", "UDP_SECURE_SCENARIO": "normal"},
+        verify_output=True,
+    ))
+    tests.append(run_demo_pair(
+        "quic_like_stream_reorder",
+        "QUIC-like 多流乱序",
+        "./bin/quic_demo_server",
+        "./bin/quic_demo_client",
+        small,
+        "quic-like-reorder.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "quic-like", "UDP_SECURE_SCENARIO": "stream-reorder"},
+        verify_output=True,
+    ))
+    tests.append(run_demo_pair(
+        "quic_like_loss_recovery",
+        "QUIC-like 丢包恢复",
+        "./bin/quic_demo_server",
+        "./bin/quic_demo_client",
+        small,
+        "quic-like-loss.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "quic-like", "UDP_SECURE_SCENARIO": "loss-recovery"},
+        verify_output=True,
+    ))
+    tests.append(run_demo_pair(
+        "quic_like_zero_rtt",
+        "QUIC-like 0-RTT 风险日志",
+        "./bin/quic_demo_server",
+        "./bin/quic_demo_client",
+        small,
+        "quic-like-zero-rtt.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "quic-like", "UDP_SECURE_SCENARIO": "zero-rtt-replay-risk"},
+        verify_output=True,
+        require_log_text="ZERO_RTT_REPLAY_RISK",
+    ))
     tests.append(test_missing_input())
     tests.append(test_timeout())
     tests.append(test_malformed_packet(small))

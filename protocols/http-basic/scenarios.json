@@ -1,0 +1,9 @@
+{
+  "protocol": "http-basic",
+  "scenarios": [
+    {"id": "normal", "name": "正常请求链路", "description": "依次演示 GET /status、POST /auth、POST /upload。"},
+    {"id": "bad-auth", "name": "认证失败", "description": "POST /auth 返回 403 Forbidden。"},
+    {"id": "payload-too-large", "name": "过大请求体", "description": "POST /upload 超过教学阈值，服务端返回 413。"},
+    {"id": "bad-method", "name": "错误方法", "description": "对 /status 使用错误方法，演示 405 Method Not Allowed。"}
+  ]
+}

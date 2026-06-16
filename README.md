@@ -1,6 +1,19 @@
-# Secure UDP Transfer Lab
+# Multi-Protocol Teaching Lab
 
-本目录实现“Client-Server 的简单安全通信协议”实验：UDP server/client 按规定完成密码认证和文件传输，Web 控制台通过本地 HTTP/WebSocket 启动进程、查看协议包、传输进度、SHA1 摘要、结构化日志和测试结果。
+本目录现在是一个“统一实验台里的多协议教学演示平台”。它在原有 `udp-basic` 和 `udp-reliable` 之上，继续接入：
+
+- `tcp-basic`
+- `tls-like`
+- `http-basic`
+- `websocket-basic`
+- `quic-like`
+
+整个平台复用同一套协议目录、控制后端、日志 schema、前端面板与测试脚本：
+
+- `protocols/<id>/schema.json + scenarios.json`
+- `control_server` 统一拉起对应 demo 二进制
+- Web 控制台统一展示时序、Inspector、传输视图、日志与测试
+- schema v2 统一输出 `protocol / transport / flow_id / session_id / scenario`
 
 ## 实验环境
 
@@ -8,7 +21,7 @@
 - 编译器: `gcc`
 - 构建工具: `make`
 - 语言: C11, HTML, CSS, JavaScript, Python 3 测试脚本
-- 通信: UDP, 本地 HTTP/WebSocket
+- 通信: UDP, TCP, 本地 HTTP/WebSocket
 - 日志: JSON Lines
 - 依赖: 不依赖 OpenSSL，SHA1 使用项目内 C 实现
 
@@ -22,8 +35,12 @@ make clean
 
 `make` 会生成在 `bin/` 子目录：
 
-- `bin/server`
-- `bin/client`
+- `bin/server` / `bin/client`
+- `bin/tcp_server` / `bin/tcp_client`
+- `bin/tls_server` / `bin/tls_client`
+- `bin/http_demo_server` / `bin/http_demo_client`
+- `bin/websocket_demo_server` / `bin/websocket_demo_client`
+- `bin/quic_demo_server` / `bin/quic_demo_client`
 - `bin/control_server`
 
 ## 命令行运行方式
@@ -60,7 +77,28 @@ make clean
 
 交互模式不会破坏基础验收格式。
 
-## 协议与数据包格式
+## 协议范围
+
+真实传输演示：
+
+- `udp-basic`
+- `udp-reliable`
+- `tcp-basic`
+- `http-basic`
+- `websocket-basic`
+
+教学版协议：
+
+- `tls-like`
+- `quic-like`
+
+说明：
+
+- `tls-like` 不是 TLS，只演示握手、HMAC 完整性与“有加密 / 无加密”的教学概念
+- `quic-like` 不是完整 QUIC，只演示连接 ID、多 stream、ACK / 重传、0-RTT 风险
+- 这些安全性质仅用于课堂演示，不代表生产级安全
+
+## UDP / TCP 基础消息格式
 
 严格实现流程：
 
@@ -124,11 +162,51 @@ http://127.0.0.1:8080/
 
 控制台采用左侧可折叠控制边栏 + 右侧多 Tab 展示区：
 
-- 左侧边栏: server/client 配置、启动/停止、重置、兼容三密码、交互式密码输入
+- 左侧边栏: 协议/场景选择、server/client 配置、启动/停止、重置、兼容三密码、交互式密码输入
 - Dashboard: 总览状态、协议阶段、传输摘要、SHA1 摘要、最近日志
 - Protocol: 协议时序图、包列表、Packet Inspector
-- Transfer: 传输进度、分片矩阵、吞吐率、SHA1 校验
+- Transfer: 文件型协议显示进度 / 分片矩阵；HTTP / WebSocket 显示事务 / 消息视图
 - Logs & Test: 实时日志、过滤搜索、异常模拟、测试结果
+
+## 协议配置目录
+
+```text
+protocols/
+  catalog.json
+  udp-basic/
+    schema.json
+    scenarios.json
+  udp-reliable/
+    schema.json
+    scenarios.json
+  tcp-basic/
+    schema.json
+    scenarios.json
+  tls-like/
+    schema.json
+    scenarios.json
+  http-basic/
+    schema.json
+    scenarios.json
+  websocket-basic/
+    schema.json
+    scenarios.json
+  quic-like/
+    schema.json
+    scenarios.json
+```
+
+- `catalog.json`: 当前可接入协议列表
+- `schema.json`: 包类型、状态机、日志字段等协议 schema
+- `scenarios.json`: 正常传输、认证失败、超时等场景配置
+
+其中新增协议额外字段：
+
+- `tcp-basic`: `stream_offset`
+- `tls-like`: `security.encrypted / mac_valid / replay / handshake_phase`
+- `http-basic`: `method / path / status_code / header_summary`
+- `websocket-basic`: `frame_type`
+- `quic-like`: `connection_id / stream_id / seq / ack / retransmit_count`
 
 ## HTTP/WebSocket 接口
 
@@ -178,6 +256,15 @@ cd udp-secure-transfer
 - 第三次密码正确
 - 三次密码全部错误，server 发送 `REJECT`，双方 `ABORT`
 - 大文件多 DATA 分片传输
+- Reliable UDP 正常传输
+- Reliable UDP 丢包后恢复
+- Reliable UDP 乱序后恢复
+- Reliable UDP 重复包后恢复
+- TCP Basic 正常传输 / 半包粘包 / 中途断连
+- TLS-like 正常握手 / 篡改 Finished / 篡改 APP_DATA / replay
+- HTTP Basic 正常请求链路 / 错误密码 / 过大 body / 错误方法
+- WebSocket Basic 正常升级 / 错误 Upgrade / Ping 超时 / 异常关闭
+- QUIC-like 正常单流 / 多 stream 乱序 / 丢包恢复 / 0-RTT replay 风险日志
 - 服务器输入文件不存在
 - 客户端连接未启动服务器触发超时
 - 未知包类型触发解析异常
@@ -198,13 +285,23 @@ logs/control.jsonl
 ```json
 {
   "time": "2026-06-06T00:00:00.000",
+  "schema_version": "2",
+  "protocol": "udp-basic",
+  "transport": "udp",
   "role": "client",
+  "flow_id": "udp-basic-001",
+  "session_id": "session-001",
+  "scenario": "normal",
   "level": "DATA",
   "event": "RECV_TRANSFER_PACKET",
   "peer": "127.0.0.1:9000",
   "state": "DATA_TRANSFER",
   "packet_type": "DATA",
   "packet_id": 3,
+  "seq": 3,
+  "ack": 4,
+  "window_size": 4,
+  "retransmit_count": 1,
   "payload_length": 1000,
   "bytes": 1000,
   "wire_hex": "0005000003e800000003...",
@@ -214,6 +311,8 @@ logs/control.jsonl
 
 说明：
 
+- `flow_id` / `session_id` 由控制后端在一次实验 run 内统一分配，server/client 日志天然对齐。
+- Reliable UDP 会额外记录 `ACK` / `NACK`，以及 `seq / ack / window_size / retransmit_count`。
 - `PASS_RESP` 不记录密码明文，只记录类型和长度。
 - `DATA.wire_hex` 对大载荷只保留预览，避免日志过大；字段解析仍保留 type、payload length、packet id 和字节数。
 - 认证、异常、摘要、最终状态使用 `AUTH_*`、`TIMEOUT`、`SEQUENCE_ERROR`、`DIGEST_MATCH`、`FINAL_OK`、`FINAL_ABORT` 等事件。

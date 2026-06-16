@@ -1,0 +1,29 @@
+{
+  "protocol": "udp-reliable",
+  "scenarios": [
+    {
+      "id": "normal",
+      "name": "正常传输",
+      "kind": "standard",
+      "description": "Reliable UDP 使用 ACK/NACK、超时重传和滑动窗口完成传输。"
+    },
+    {
+      "id": "loss-recovery",
+      "name": "丢包恢复",
+      "kind": "standard",
+      "description": "首轮发送时丢弃部分 DATA，依赖超时重传与 ACK 继续完成传输。"
+    },
+    {
+      "id": "reorder-recovery",
+      "name": "乱序恢复",
+      "kind": "standard",
+      "description": "首轮发送时延迟部分 DATA，触发 NACK 与接收端乱序缓存。"
+    },
+    {
+      "id": "duplicate-recovery",
+      "name": "重复包恢复",
+      "kind": "standard",
+      "description": "首轮发送时复制部分 DATA，验证接收端去重与 ACK 稳定性。"
+    }
+  ]
+}

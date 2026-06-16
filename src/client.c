@@ -15,6 +15,12 @@
 
 static volatile sig_atomic_t stop_requested = 0;
 
+typedef struct {
+    uint8_t *data;
+    uint32_t length;
+    int present;
+} BufferedChunk;
+
 static void handle_signal(int signo) {
     (void)signo;
     stop_requested = 1;
@@ -28,6 +34,16 @@ static LogEvent log_defaults(const char *level, const char *event, const char *s
     e.event = event;
     e.state = state;
     e.message = message;
+    e.stream_id = LOG_INT_UNSET;
+    e.stream_offset = LOG_INT_UNSET;
+    e.status_code = LOG_INT_UNSET;
+    e.seq = LOG_INT_UNSET;
+    e.ack = LOG_INT_UNSET;
+    e.window_size = LOG_INT_UNSET;
+    e.retransmit_count = LOG_INT_UNSET;
+    e.security_encrypted = LOG_INT_UNSET;
+    e.security_mac_valid = LOG_INT_UNSET;
+    e.security_replay = LOG_INT_UNSET;
     e.packet_id = LOG_INT_UNSET;
     e.payload_length = LOG_INT_UNSET;
     e.bytes = LOG_INT_UNSET;
@@ -46,10 +62,21 @@ static void finish(Logger *logger, const char *result, const char *reason) {
     fflush(stdout);
 }
 
+static void free_buffered_chunks(BufferedChunk *chunks, size_t count) {
+    size_t i;
+    if (!chunks) {
+        return;
+    }
+    for (i = 0; i < count; i += 1) {
+        free(chunks[i].data);
+    }
+    free(chunks);
+}
+
 static void log_packet(Logger *logger, const char *level, const char *event,
                        const char *state, const char *peer, const uint8_t *wire,
                        size_t wire_len, const Packet *packet, const char *direction,
-                       int attempt) {
+                       int attempt, int retransmit_count) {
     char hex[PROTOCOL_RECV_BUFFER * 2 + 1];
     char uid[24];
     LogEvent e = log_defaults(level, event, state, "packet event");
@@ -60,6 +87,7 @@ static void log_packet(Logger *logger, const char *level, const char *event,
     e.packet_code = (int)packet->type;
     e.payload_length = (int)packet->payload_length;
     e.direction = direction;
+    e.retransmit_count = retransmit_count;
     compute_packet_uid(uid, sizeof(uid), packet->type,
                        packet->type == PKT_DATA ? (int)packet->packet_id : 0,
                        attempt, wire, wire_len);
@@ -74,29 +102,39 @@ static void log_packet(Logger *logger, const char *level, const char *event,
     }
     if (packet->type == PKT_DATA) {
         e.packet_id = (int)packet->packet_id;
+        e.seq = (int)packet->packet_id;
         e.bytes = (int)packet->payload_length;
+    } else if (packet->type == PKT_ACK || packet->type == PKT_NACK) {
+        e.ack = (int)packet->ack_id;
+        e.window_size = (int)packet->window_size;
+        e.packet_id = (int)packet->ack_id;
     }
     logger_write(logger, &e);
 }
 
 static int send_logged(Logger *logger, int sockfd, const struct sockaddr_in *peer,
                        const char *peer_text, uint16_t type, const uint8_t *wire,
-                       size_t wire_len, uint32_t payload_len, const char *state,
-                       const char *event, int attempt) {
+                       size_t wire_len, uint32_t payload_len, uint32_t ack_id,
+                       uint32_t window_size, const char *state,
+                       const char *event, int attempt, int retransmit_count) {
     Packet packet;
     memset(&packet, 0, sizeof(packet));
     packet.type = type;
     packet.payload_length = payload_len;
+    packet.ack_id = ack_id;
+    packet.window_size = window_size;
     if (send_all_packet(sockfd, wire, wire_len, peer) != 0) {
         LogEvent e = log_defaults("ERROR", "SEND_ERROR", state, strerror(errno));
         e.peer = peer_text;
         e.packet_type = packet_type_name(type);
         e.packet_code = (int)type;
         e.direction = "Client -> Server";
+        e.retransmit_count = retransmit_count;
         logger_write(logger, &e);
         return -1;
     }
-    log_packet(logger, "INFO", event, state, peer_text, wire, wire_len, &packet, "Client -> Server", attempt);
+    log_packet(logger, "INFO", event, state, peer_text, wire, wire_len, &packet,
+               "Client -> Server", attempt, retransmit_count);
     if (attempt != LOG_INT_UNSET) {
         LogEvent e = log_defaults("AUTH", "AUTH_ATTEMPT_SENT", state, "password attempt sent");
         e.peer = peer_text;
@@ -107,11 +145,15 @@ static int send_logged(Logger *logger, int sockfd, const struct sockaddr_in *pee
     return 0;
 }
 
-static int recv_logged(Logger *logger, int sockfd, Packet *packet,
-                       struct sockaddr_in *peer, const char *state,
-                       const char *event, char *peer_text, size_t peer_text_size) {
+static int recv_logged_timeout(Logger *logger, int sockfd, Packet *packet,
+                               struct sockaddr_in *peer, const char *state,
+                               const char *event, char *peer_text, size_t peer_text_size,
+                               int timeout_ms, int log_timeout) {
     char error[160];
-    if (recv_packet_timeout(sockfd, packet, peer, env_timeout_ms(), error, sizeof(error)) != 0) {
+    if (recv_packet_timeout(sockfd, packet, peer, timeout_ms, error, sizeof(error)) != 0) {
+        if (!log_timeout && strcmp(error, "timeout") == 0) {
+            return 1;
+        }
         LogEvent e = log_defaults(strcmp(error, "timeout") == 0 ? "WARN" : "ERROR",
                                   strcmp(error, "timeout") == 0 ? "TIMEOUT" : "PARSE_ERROR",
                                   state, error);
@@ -122,8 +164,15 @@ static int recv_logged(Logger *logger, int sockfd, Packet *packet,
     }
     peer_to_string(peer, peer_text, peer_text_size);
     log_packet(logger, packet->type == PKT_DATA ? "DATA" : "INFO", event, state,
-               peer_text, packet->wire, packet->wire_length, packet, "Server -> Client", 0);
+               peer_text, packet->wire, packet->wire_length, packet, "Server -> Client", 0, 0);
     return 0;
+}
+
+static int recv_logged(Logger *logger, int sockfd, Packet *packet,
+                       struct sockaddr_in *peer, const char *state,
+                       const char *event, char *peer_text, size_t peer_text_size) {
+    return recv_logged_timeout(logger, sockfd, packet, peer, state, event,
+                               peer_text, peer_text_size, env_timeout_ms(), 1);
 }
 
 static int resolve_server(const char *host, uint16_t port, struct sockaddr_in *addr) {
@@ -177,6 +226,190 @@ static int get_password(int interactive, char **passwords, int index, char *buf,
     return strlen(buf) <= PROTOCOL_MAX_PASSWORD ? 0 : -1;
 }
 
+static int send_feedback(Logger *logger, int sockfd, const struct sockaddr_in *peer,
+                         const char *peer_text, uint16_t type, uint32_t ack_id,
+                         uint32_t window_size, const char *state, const char *event) {
+    uint8_t wire[PROTOCOL_MAX_DATAGRAM];
+    size_t wire_len = 0;
+    if (build_feedback_packet(type, ack_id, window_size, wire, sizeof(wire), &wire_len) != 0) {
+        return -1;
+    }
+    return send_logged(logger, sockfd, peer, peer_text, type, wire, wire_len,
+                       PROTOCOL_FEEDBACK_PAYLOAD_SIZE, ack_id, window_size,
+                       state, event, LOG_INT_UNSET, 0);
+}
+
+static int ensure_buffer_capacity(BufferedChunk **chunks, size_t *capacity, size_t need) {
+    BufferedChunk *next;
+    size_t new_cap = *capacity;
+    if (need <= *capacity) {
+        return 0;
+    }
+    while (new_cap < need) {
+        new_cap = new_cap ? new_cap * 2 : 32;
+    }
+    next = realloc(*chunks, new_cap * sizeof(*next));
+    if (!next) {
+        return -1;
+    }
+    memset(next + *capacity, 0, (new_cap - *capacity) * sizeof(*next));
+    *chunks = next;
+    *capacity = new_cap;
+    return 0;
+}
+
+static int transfer_file_reliable(Logger *logger, int sockfd, const struct sockaddr_in *server_addr,
+                                  const char *server_peer_text, const char *output_path,
+                                  const char *temp_path, FILE *out,
+                                  uint64_t *received_bytes_out) {
+    BufferedChunk *buffered = NULL;
+    size_t buffered_cap = 0;
+    uint32_t expected_packet_id = 0;
+    uint64_t received_bytes = 0;
+    Packet packet;
+    struct sockaddr_in recv_peer;
+    char recv_peer_text[64];
+    int receiver_window = env_reliable_window_size();
+
+    while (!stop_requested) {
+        if (recv_logged(logger, sockfd, &packet, &recv_peer, "DATA_TRANSFER", "RECV_TRANSFER_PACKET",
+                        recv_peer_text, sizeof(recv_peer_text)) != 0 ||
+            !is_same_peer(server_addr, &recv_peer)) {
+            free_buffered_chunks(buffered, buffered_cap);
+            return -1;
+        }
+
+        if (packet.type == PKT_DATA) {
+            if (packet.packet_id < expected_packet_id) {
+                LogEvent dup = log_defaults("WARN", "DUPLICATE_DATA", "DATA_TRANSFER",
+                                            "duplicate DATA packet ignored");
+                dup.peer = server_peer_text;
+                dup.packet_id = (int)packet.packet_id;
+                dup.seq = (int)packet.packet_id;
+                logger_write(logger, &dup);
+                if (send_feedback(logger, sockfd, server_addr, server_peer_text, PKT_ACK,
+                                  expected_packet_id, (uint32_t)receiver_window,
+                                  "DATA_TRANSFER", "SEND_ACK") != 0) {
+                    free_buffered_chunks(buffered, buffered_cap);
+                    return -1;
+                }
+                continue;
+            }
+
+            if (ensure_buffer_capacity(&buffered, &buffered_cap, (size_t)packet.packet_id + 1) != 0) {
+                free_buffered_chunks(buffered, buffered_cap);
+                return -1;
+            }
+
+            if (!buffered[packet.packet_id].present) {
+                buffered[packet.packet_id].data = malloc(packet.payload_length ? packet.payload_length : 1);
+                if (!buffered[packet.packet_id].data) {
+                    free_buffered_chunks(buffered, buffered_cap);
+                    return -1;
+                }
+                if (packet.payload_length > 0) {
+                    memcpy(buffered[packet.packet_id].data, packet.payload, packet.payload_length);
+                }
+                buffered[packet.packet_id].length = packet.payload_length;
+                buffered[packet.packet_id].present = 1;
+            }
+
+            if (packet.packet_id > expected_packet_id) {
+                LogEvent gap = log_defaults("WARN", "OUT_OF_ORDER_DATA", "DATA_TRANSFER",
+                                            "received out-of-order DATA packet");
+                gap.peer = server_peer_text;
+                gap.packet_id = (int)packet.packet_id;
+                gap.seq = (int)packet.packet_id;
+                gap.ack = (int)expected_packet_id;
+                logger_write(logger, &gap);
+                if (send_feedback(logger, sockfd, server_addr, server_peer_text, PKT_NACK,
+                                  expected_packet_id, (uint32_t)receiver_window,
+                                  "DATA_TRANSFER", "SEND_NACK") != 0) {
+                    free_buffered_chunks(buffered, buffered_cap);
+                    return -1;
+                }
+            }
+
+            while (expected_packet_id < buffered_cap && buffered[expected_packet_id].present) {
+                if (buffered[expected_packet_id].length > 0 &&
+                    fwrite(buffered[expected_packet_id].data, 1, buffered[expected_packet_id].length, out) !=
+                        buffered[expected_packet_id].length) {
+                    free_buffered_chunks(buffered, buffered_cap);
+                    return -1;
+                }
+                received_bytes += buffered[expected_packet_id].length;
+                free(buffered[expected_packet_id].data);
+                buffered[expected_packet_id].data = NULL;
+                buffered[expected_packet_id].length = 0;
+                buffered[expected_packet_id].present = 0;
+                expected_packet_id += 1;
+            }
+
+            if (send_feedback(logger, sockfd, server_addr, server_peer_text, PKT_ACK,
+                              expected_packet_id, (uint32_t)receiver_window,
+                              "DATA_TRANSFER", "SEND_ACK") != 0) {
+                free_buffered_chunks(buffered, buffered_cap);
+                return -1;
+            }
+        } else if (packet.type == PKT_TERMINATE) {
+            uint8_t local_digest[PROTOCOL_DIGEST_SIZE];
+            char server_sha[SHA1_HEX_LENGTH + 1];
+            char local_sha[SHA1_HEX_LENGTH + 1];
+            int match;
+            fclose(out);
+            if (sha1_file(temp_path, local_digest) != 0) {
+                free_buffered_chunks(buffered, buffered_cap);
+                return -1;
+            }
+            sha1_to_hex(packet.payload, server_sha);
+            sha1_to_hex(local_digest, local_sha);
+            match = memcmp(packet.payload, local_digest, PROTOCOL_DIGEST_SIZE) == 0;
+            {
+                LogEvent digest = log_defaults(match ? "SUCCESS" : "ERROR",
+                                               match ? "DIGEST_MATCH" : "DIGEST_MISMATCH",
+                                               "VERIFY",
+                                               match ? "SHA1 digest matched" : "SHA1 digest mismatched");
+                digest.peer = server_peer_text;
+                digest.sha1 = local_sha;
+                digest.bytes = (int)received_bytes;
+                digest.packet_id = (int)expected_packet_id;
+                digest.result = match ? "OK" : "ABORT";
+                logger_write(logger, &digest);
+            }
+            {
+                LogEvent server_digest = log_defaults("INFO", "SERVER_DIGEST", "VERIFY",
+                                                      "server SHA1 digest");
+                server_digest.peer = server_peer_text;
+                server_digest.sha1 = server_sha;
+                logger_write(logger, &server_digest);
+            }
+            if (send_feedback(logger, sockfd, server_addr, server_peer_text, PKT_ACK,
+                              expected_packet_id, (uint32_t)receiver_window,
+                              "VERIFY", "SEND_ACK") != 0) {
+                free_buffered_chunks(buffered, buffered_cap);
+                return -1;
+            }
+            if (!match) {
+                free_buffered_chunks(buffered, buffered_cap);
+                return -1;
+            }
+            if (rename(temp_path, output_path) != 0) {
+                free_buffered_chunks(buffered, buffered_cap);
+                return -1;
+            }
+            *received_bytes_out = received_bytes;
+            free_buffered_chunks(buffered, buffered_cap);
+            return 0;
+        } else {
+            free_buffered_chunks(buffered, buffered_cap);
+            return -1;
+        }
+    }
+
+    free_buffered_chunks(buffered, buffered_cap);
+    return -1;
+}
+
 static void usage(const char *program) {
     fprintf(stderr,
             "Usage: %s <servername> <serverport> <clientpwd1> <clientpwd2> <clientpwd3> <outputfile>\n"
@@ -205,6 +438,7 @@ int main(int argc, char **argv) {
     FILE *out = NULL;
     uint32_t expected_packet_id = 0;
     uint64_t received_bytes = 0;
+    int reliable_mode = protocol_is_reliable();
 
     ensure_runtime_dirs();
     signal(SIGINT, handle_signal);
@@ -271,7 +505,8 @@ int main(int argc, char **argv) {
 
     if (build_control_packet(PKT_JOIN_REQ, wire, sizeof(wire), &wire_len) != 0 ||
         send_logged(&logger, sockfd, &server_addr, server_peer_text, PKT_JOIN_REQ, wire,
-                    wire_len, 0, "WAIT_PASS_REQ", "SEND_JOIN_REQ", LOG_INT_UNSET) != 0) {
+                    wire_len, 0, 0, 0, "WAIT_PASS_REQ", "SEND_JOIN_REQ",
+                    LOG_INT_UNSET, 0) != 0) {
         finish(&logger, "ABORT", "failed to send JOIN_REQ");
         fclose(out);
         remove(temp_path);
@@ -305,7 +540,8 @@ int main(int argc, char **argv) {
             attempt++;
             if (build_pass_resp_packet(password, wire, sizeof(wire), &wire_len) != 0 ||
                 send_logged(&logger, sockfd, &server_addr, server_peer_text, PKT_PASS_RESP, wire,
-                            wire_len, (uint32_t)strlen(password), "AUTH", "SEND_PASS_RESP", attempt) != 0) {
+                            wire_len, (uint32_t)strlen(password), 0, 0,
+                            "AUTH", "SEND_PASS_RESP", attempt, 0) != 0) {
                 finish(&logger, "ABORT", "failed to send PASS_RESP");
                 fclose(out);
                 remove(temp_path);
@@ -334,6 +570,21 @@ int main(int argc, char **argv) {
             logger_close(&logger);
             return 1;
         }
+    }
+
+    if (reliable_mode) {
+        if (transfer_file_reliable(&logger, sockfd, &server_addr, server_peer_text,
+                                   output_path, temp_path, out, &received_bytes) != 0) {
+            finish(&logger, "ABORT", "reliable transfer failed");
+            remove(temp_path);
+            close(sockfd);
+            logger_close(&logger);
+            return 1;
+        }
+        finish(&logger, "OK", "file received and SHA1 verified");
+        close(sockfd);
+        logger_close(&logger);
+        return 0;
     }
 
     while (!stop_requested) {

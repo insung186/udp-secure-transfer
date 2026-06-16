@@ -39,8 +39,23 @@ typedef struct {
 } ChildProc;
 
 typedef struct {
+    char protocol[64];
+    char transport[32];
+    char scenario[64];
+    char flow_id[64];
+    char session_id[64];
+    unsigned int run_seq;
+} ExperimentState;
+
+typedef struct {
+    const char *key;
+    const char *value;
+} ChildEnv;
+
+typedef struct {
     ChildProc server;
     ChildProc client;
+    ExperimentState experiment;
     int ws_fd;
     long server_log_offset;
     long client_log_offset;
@@ -58,12 +73,115 @@ static LogEvent log_defaults(const char *level, const char *event, const char *m
     e.level = level;
     e.event = event;
     e.message = message;
+    e.stream_id = LOG_INT_UNSET;
+    e.stream_offset = LOG_INT_UNSET;
+    e.status_code = LOG_INT_UNSET;
+    e.seq = LOG_INT_UNSET;
+    e.ack = LOG_INT_UNSET;
+    e.window_size = LOG_INT_UNSET;
+    e.retransmit_count = LOG_INT_UNSET;
+    e.security_encrypted = LOG_INT_UNSET;
+    e.security_mac_valid = LOG_INT_UNSET;
+    e.security_replay = LOG_INT_UNSET;
     e.packet_id = LOG_INT_UNSET;
     e.payload_length = LOG_INT_UNSET;
     e.bytes = LOG_INT_UNSET;
     e.attempt = LOG_INT_UNSET;
     e.port = LOG_INT_UNSET;
     return e;
+}
+
+static void experiment_set_default_protocol(void) {
+    if (!state.experiment.protocol[0]) {
+        snprintf(state.experiment.protocol, sizeof(state.experiment.protocol), "%s", "udp-basic");
+    }
+    if (!state.experiment.transport[0]) {
+        snprintf(state.experiment.transport, sizeof(state.experiment.transport), "%s", "udp");
+    }
+    if (!state.experiment.scenario[0]) {
+        snprintf(state.experiment.scenario, sizeof(state.experiment.scenario), "%s", "normal");
+    }
+}
+
+static void experiment_clear(void) {
+    memset(&state.experiment, 0, sizeof(state.experiment));
+}
+
+static void experiment_apply_to_event(LogEvent *event) {
+    if (!event) {
+        return;
+    }
+    experiment_set_default_protocol();
+    event->schema_version = "2";
+    event->protocol = state.experiment.protocol;
+    event->transport = state.experiment.transport;
+    event->scenario = state.experiment.scenario;
+    event->flow_id = state.experiment.flow_id[0] ? state.experiment.flow_id : NULL;
+    event->session_id = state.experiment.session_id[0] ? state.experiment.session_id : NULL;
+}
+
+static void experiment_configure(const char *protocol, const char *scenario) {
+    state.experiment.run_seq += 1;
+    snprintf(state.experiment.protocol, sizeof(state.experiment.protocol), "%s",
+             (protocol && protocol[0]) ? protocol : "udp-basic");
+    if (strncmp(state.experiment.protocol, "tcp", 3) == 0 ||
+        strcmp(state.experiment.protocol, "tls-like") == 0 ||
+        strcmp(state.experiment.protocol, "http-basic") == 0 ||
+        strcmp(state.experiment.protocol, "websocket-basic") == 0) {
+        snprintf(state.experiment.transport, sizeof(state.experiment.transport), "%s", "tcp");
+    } else {
+        snprintf(state.experiment.transport, sizeof(state.experiment.transport), "%s", "udp");
+    }
+    snprintf(state.experiment.scenario, sizeof(state.experiment.scenario), "%s",
+             (scenario && scenario[0]) ? scenario : "normal");
+    snprintf(state.experiment.flow_id, sizeof(state.experiment.flow_id), "%.52s-%03u",
+             state.experiment.protocol, state.experiment.run_seq);
+    snprintf(state.experiment.session_id, sizeof(state.experiment.session_id), "session-%03u",
+             state.experiment.run_seq);
+}
+
+static const char *server_binary_for_protocol(const char *protocol) {
+    if (!protocol || strcmp(protocol, "udp-basic") == 0 || strcmp(protocol, "udp-reliable") == 0) {
+        return "./bin/server";
+    }
+    if (strcmp(protocol, "tcp-basic") == 0) {
+        return "./bin/tcp_server";
+    }
+    if (strcmp(protocol, "tls-like") == 0) {
+        return "./bin/tls_server";
+    }
+    if (strcmp(protocol, "http-basic") == 0) {
+        return "./bin/http_demo_server";
+    }
+    if (strcmp(protocol, "websocket-basic") == 0) {
+        return "./bin/websocket_demo_server";
+    }
+    if (strcmp(protocol, "quic-like") == 0) {
+        return "./bin/quic_demo_server";
+    }
+    return NULL;
+}
+
+static const char *client_binary_for_protocol(const char *protocol) {
+    if (!protocol || strcmp(protocol, "udp-basic") == 0 || strcmp(protocol, "udp-reliable") == 0) {
+        return "./bin/client";
+    }
+    if (strcmp(protocol, "tcp-basic") == 0) {
+        return "./bin/tcp_client";
+    }
+    if (strcmp(protocol, "tls-like") == 0) {
+        return "./bin/tls_client";
+    }
+    if (strcmp(protocol, "http-basic") == 0) {
+        return "./bin/http_demo_client";
+    }
+    if (strcmp(protocol, "websocket-basic") == 0) {
+        return "./bin/websocket_demo_client";
+    }
+    if (strcmp(protocol, "quic-like") == 0) {
+        return "./bin/quic_demo_client";
+    }
+    return NULL;
 }
 
 static void appendf(char *buf, size_t cap, const char *fmt, ...) {
@@ -180,6 +298,7 @@ static void reap_child(ChildProc *proc) {
         LogEvent e = log_defaults("INFO", "PROCESS_EXIT", "child process exited");
         e.pid = proc->pid;
         e.result = proc->result;
+        experiment_apply_to_event(&e);
         logger_write(&control_logger, &e);
         proc->pid = -1;
         close_if_open(&proc->stdout_fd);
@@ -188,7 +307,8 @@ static void reap_child(ChildProc *proc) {
     }
 }
 
-static int start_child(ChildProc *proc, char *const argv[], int with_stdin) {
+static int start_child(ChildProc *proc, char *const argv[], int with_stdin,
+                       const ChildEnv *envs, size_t env_count) {
     int out_pipe[2];
     int err_pipe[2];
     int in_pipe[2] = {-1, -1};
@@ -219,6 +339,7 @@ static int start_child(ChildProc *proc, char *const argv[], int with_stdin) {
         return -1;
     }
     if (pid == 0) {
+        size_t i;
         if (with_stdin) {
             dup2(in_pipe[0], STDIN_FILENO);
         }
@@ -230,6 +351,11 @@ static int start_child(ChildProc *proc, char *const argv[], int with_stdin) {
         close(err_pipe[1]);
         close_if_open(&in_pipe[0]);
         close_if_open(&in_pipe[1]);
+        for (i = 0; i < env_count; i += 1) {
+            if (envs[i].key && envs[i].value) {
+                setenv(envs[i].key, envs[i].value, 1);
+            }
+        }
         execv(argv[0], argv);
         _exit(127);
     }
@@ -250,6 +376,7 @@ static int start_child(ChildProc *proc, char *const argv[], int with_stdin) {
 
     LogEvent e = log_defaults("INFO", "PROCESS_START", "child process started");
     e.pid = pid;
+    experiment_apply_to_event(&e);
     logger_write(&control_logger, &e);
     return 0;
 }
@@ -272,6 +399,7 @@ static void handle_child_output(ChildProc *proc, int fd, const char *stream_name
     e.pid = proc->pid;
     e.peer = stream_name;
     e.result = proc->result;
+    experiment_apply_to_event(&e);
     logger_write(&control_logger, &e);
 }
 
@@ -353,7 +481,11 @@ static void serve_static(int fd, const char *path) {
         send_http(fd, "403 Forbidden", "application/json", "{\"error\":\"forbidden\"}");
         return;
     }
-    snprintf(full_path, sizeof(full_path), "web%s", relative);
+    if (strncmp(relative, "/protocols/", 11) == 0) {
+        snprintf(full_path, sizeof(full_path), ".%s", relative);
+    } else {
+        snprintf(full_path, sizeof(full_path), "web%s", relative);
+    }
     if (read_file_text(full_path, &body, &len) != 0) {
         (void)len;
         send_http(fd, "404 Not Found", "application/json", "{\"error\":\"not found\"}");
@@ -835,17 +967,31 @@ static void api_status(int fd) {
     char json[4096] = {0};
     char server_last[SMALL_BUF];
     char client_last[SMALL_BUF];
+    char protocol[128];
+    char transport[128];
+    char scenario[128];
+    char flow_id[128];
+    char session_id[128];
+    experiment_set_default_protocol();
     json_escape_to(server_last, sizeof(server_last), state.server.last_output);
     json_escape_to(client_last, sizeof(client_last), state.client.last_output);
+    json_escape_to(protocol, sizeof(protocol), state.experiment.protocol);
+    json_escape_to(transport, sizeof(transport), state.experiment.transport);
+    json_escape_to(scenario, sizeof(scenario), state.experiment.scenario);
+    json_escape_to(flow_id, sizeof(flow_id), state.experiment.flow_id);
+    json_escape_to(session_id, sizeof(session_id), state.experiment.session_id);
     appendf(json, sizeof(json),
             "{\"server\":{\"running\":%s,\"pid\":%ld,\"result\":\"%s\",\"last_output\":%s},"
             "\"client\":{\"running\":%s,\"pid\":%ld,\"result\":\"%s\",\"last_output\":%s},"
-            "\"websocket\":%s}",
+            "\"websocket\":%s,"
+            "\"experiment\":{\"protocol\":%s,\"transport\":%s,\"scenario\":%s,"
+            "\"flow_id\":%s,\"session_id\":%s}}",
             child_running(&state.server) ? "true" : "false", (long)state.server.pid,
             state.server.result, server_last,
             child_running(&state.client) ? "true" : "false", (long)state.client.pid,
             state.client.result, client_last,
-            state.ws_fd >= 0 ? "true" : "false");
+            state.ws_fd >= 0 ? "true" : "false",
+            protocol, transport, scenario, flow_id, session_id);
     send_http(fd, "200 OK", "application/json; charset=utf-8", json);
 }
 
@@ -866,14 +1012,69 @@ static void truncate_logs(void) {
     state.packets_log_offset = 0;
 }
 
+static size_t build_protocol_envs(ChildEnv *envs, size_t cap) {
+    size_t count = 0;
+    if (cap < 6) {
+        return 0;
+    }
+    envs[count++] = (ChildEnv){"UDP_SECURE_SCHEMA_VERSION", "2"};
+    envs[count++] = (ChildEnv){"UDP_SECURE_PROTOCOL", state.experiment.protocol};
+    envs[count++] = (ChildEnv){"UDP_SECURE_TRANSPORT", state.experiment.transport};
+    envs[count++] = (ChildEnv){"UDP_SECURE_SCENARIO", state.experiment.scenario};
+    envs[count++] = (ChildEnv){"UDP_SECURE_FLOW_ID", state.experiment.flow_id};
+    envs[count++] = (ChildEnv){"UDP_SECURE_SESSION_ID", state.experiment.session_id};
+    if (strcmp(state.experiment.protocol, "udp-reliable") == 0 && count + 5 <= cap) {
+        const char *loss_ids = "";
+        const char *dup_ids = "";
+        const char *reorder_ids = "";
+        envs[count++] = (ChildEnv){"UDP_SECURE_WINDOW_SIZE", "4"};
+        envs[count++] = (ChildEnv){"UDP_SECURE_RELIABLE_TIMEOUT_MS", "250"};
+        if (strcmp(state.experiment.scenario, "loss-recovery") == 0) {
+            loss_ids = "1,3";
+        } else if (strcmp(state.experiment.scenario, "reorder-recovery") == 0) {
+            reorder_ids = "1,3";
+        } else if (strcmp(state.experiment.scenario, "duplicate-recovery") == 0) {
+            dup_ids = "2";
+        }
+        envs[count++] = (ChildEnv){"UDP_SECURE_RELIABLE_LOSS_IDS", loss_ids};
+        envs[count++] = (ChildEnv){"UDP_SECURE_RELIABLE_DUP_IDS", dup_ids};
+        envs[count++] = (ChildEnv){"UDP_SECURE_RELIABLE_REORDER_IDS", reorder_ids};
+    }
+    if (strcmp(state.experiment.protocol, "tcp-basic") == 0 && count + 1 <= cap) {
+        const char *fragment = strcmp(state.experiment.scenario, "stream-fragmentation") == 0 ? "1" : "0";
+        envs[count++] = (ChildEnv){"UDP_SECURE_STREAM_FRAGMENTATION", fragment};
+    }
+    if (strcmp(state.experiment.protocol, "tls-like") == 0 && count + 2 <= cap) {
+        const char *tampered_finished = strcmp(state.experiment.scenario, "tampered-finished") == 0 ? "1" : "0";
+        const char *tampered_app = strcmp(state.experiment.scenario, "tampered-app-data") == 0 ? "1" : "0";
+        envs[count++] = (ChildEnv){"UDP_SECURE_TAMPER_FINISHED", tampered_finished};
+        envs[count++] = (ChildEnv){"UDP_SECURE_TAMPER_APP_DATA", tampered_app};
+    }
+    if (strcmp(state.experiment.protocol, "quic-like") == 0 && count + 4 <= cap) {
+        const char *loss = strcmp(state.experiment.scenario, "loss-recovery") == 0 ? "1,4" : "";
+        const char *reorder = strcmp(state.experiment.scenario, "stream-reorder") == 0 ? "1:2,2:1" : "";
+        const char *zero_rtt = strcmp(state.experiment.scenario, "zero-rtt-replay-risk") == 0 ? "1" : "0";
+        envs[count++] = (ChildEnv){"UDP_SECURE_QUIC_LOSS", loss};
+        envs[count++] = (ChildEnv){"UDP_SECURE_QUIC_REORDER", reorder};
+        envs[count++] = (ChildEnv){"UDP_SECURE_QUIC_ZERO_RTT", zero_rtt};
+        envs[count++] = (ChildEnv){"UDP_SECURE_QUIC_WINDOW", "4"};
+    }
+    return count;
+}
+
 static void api_server_start(int fd, const char *body) {
     static char port[32], password[256], input[PATH_MAX], checked_input[PATH_MAX];
+    static char protocol[64], scenario[64];
     char error[SMALL_BUF];
-    char *args[] = {"./bin/server", port, password, checked_input, NULL};
+    ChildEnv envs[16];
+    const char *binary = NULL;
+    char *args[] = {(char *)"", port, password, checked_input, NULL};
     int port_num = json_get_int(body, "port", 9000);
     snprintf(port, sizeof(port), "%d", port_num);
     if (json_get_string(body, "password", password, sizeof(password), "secret") != 0 ||
-        json_get_string(body, "inputFile", input, sizeof(input), "test/input.txt") != 0) {
+        json_get_string(body, "inputFile", input, sizeof(input), "test/input.txt") != 0 ||
+        json_get_string(body, "protocol", protocol, sizeof(protocol), "udp-basic") != 0 ||
+        json_get_string(body, "scenario", scenario, sizeof(scenario), "normal") != 0) {
         send_http(fd, "400 Bad Request", "application/json", "{\"ok\":false,\"error\":\"invalid body\"}");
         return;
     }
@@ -881,7 +1082,18 @@ static void api_server_start(int fd, const char *body) {
         send_error_json(fd, "400 Bad Request", error);
         return;
     }
-    if (start_child(&state.server, args, 0) != 0) {
+    binary = server_binary_for_protocol(protocol);
+    if (!binary) {
+        send_http(fd, "400 Bad Request", "application/json", "{\"ok\":false,\"error\":\"unsupported protocol\"}");
+        return;
+    }
+    args[0] = (char *)binary;
+    if (child_running(&state.server)) {
+        send_http(fd, "409 Conflict", "application/json", "{\"ok\":false,\"error\":\"server already running or failed\"}");
+        return;
+    }
+    experiment_configure(protocol, scenario);
+    if (start_child(&state.server, args, 0, envs, build_protocol_envs(envs, 16)) != 0) {
         send_http(fd, "409 Conflict", "application/json", "{\"ok\":false,\"error\":\"server already running or failed\"}");
         return;
     }
@@ -890,9 +1102,12 @@ static void api_server_start(int fd, const char *body) {
 
 static void api_client_start(int fd, const char *body) {
     static char host[256], port[32], out[PATH_MAX], checked_out[PATH_MAX], pwd1[256], pwd2[256], pwd3[256], mode[32];
+    static char protocol[64], scenario[64];
     char error[SMALL_BUF];
-    char *args_compat[] = {"./bin/client", host, port, pwd1, pwd2, pwd3, checked_out, NULL};
-    char *args_interactive[] = {"./bin/client", host, port, checked_out, NULL};
+    ChildEnv envs[16];
+    const char *binary = NULL;
+    char *args_compat[] = {(char *)"", host, port, pwd1, pwd2, pwd3, checked_out, NULL};
+    char *args_interactive[] = {(char *)"", host, port, checked_out, NULL};
     int port_num = json_get_int(body, "port", 9000);
     snprintf(port, sizeof(port), "%d", port_num);
     json_get_string(body, "host", host, sizeof(host), "127.0.0.1");
@@ -901,17 +1116,33 @@ static void api_client_start(int fd, const char *body) {
     json_get_string(body, "pwd1", pwd1, sizeof(pwd1), "");
     json_get_string(body, "pwd2", pwd2, sizeof(pwd2), "");
     json_get_string(body, "pwd3", pwd3, sizeof(pwd3), "");
+    json_get_string(body, "protocol", protocol, sizeof(protocol), "udp-basic");
+    json_get_string(body, "scenario", scenario, sizeof(scenario), "normal");
     if (resolve_output_path(out, checked_out, sizeof(checked_out), error, sizeof(error)) != 0) {
         send_error_json(fd, "400 Bad Request", error);
         return;
     }
+    binary = client_binary_for_protocol(protocol);
+    if (!binary) {
+        send_http(fd, "400 Bad Request", "application/json", "{\"ok\":false,\"error\":\"unsupported protocol\"}");
+        return;
+    }
+    args_compat[0] = (char *)binary;
+    args_interactive[0] = (char *)binary;
+    if (child_running(&state.client)) {
+        send_http(fd, "409 Conflict", "application/json", "{\"ok\":false,\"error\":\"client already running or failed\"}");
+        return;
+    }
+    if (!state.experiment.flow_id[0] || !child_running(&state.server)) {
+        experiment_configure(protocol, scenario);
+    }
     if (strcmp(mode, "interactive") == 0) {
-        if (start_child(&state.client, args_interactive, 1) != 0) {
+        if (start_child(&state.client, args_interactive, 1, envs, build_protocol_envs(envs, 16)) != 0) {
             send_http(fd, "409 Conflict", "application/json", "{\"ok\":false,\"error\":\"client already running or failed\"}");
             return;
         }
     } else {
-        if (start_child(&state.client, args_compat, 0) != 0) {
+        if (start_child(&state.client, args_compat, 0, envs, build_protocol_envs(envs, 16)) != 0) {
             send_http(fd, "409 Conflict", "application/json", "{\"ok\":false,\"error\":\"client already running or failed\"}");
             return;
         }
@@ -1004,13 +1235,16 @@ static void route_api(int fd, const char *method, const char *path, const char *
         stop_child(&state.client);
         child_init(&state.server, "server");
         child_init(&state.client, "client");
+        experiment_clear();
         /* 重置时同时清空所有日志文件（保留日志目录） */
         truncate_logs();
         send_http(fd, "200 OK", "application/json", "{\"ok\":true}");
     } else if (strcmp(path, "/api/test/list") == 0) {
         send_http(fd, "200 OK", "application/json",
                   "{\"tests\":[\"first_password_ok\",\"second_password_ok\",\"third_password_ok\","
-                  "\"three_passwords_wrong\",\"server_timeout\",\"missing_input\",\"sequence_error\"]}");
+                  "\"three_passwords_wrong\",\"big_file_transfer\",\"reliable_basic\","
+                  "\"reliable_loss_recovery\",\"reliable_reorder_recovery\",\"reliable_duplicate_recovery\","
+                  "\"server_timeout\",\"missing_input\",\"sequence_error\"]}");
     } else if (strcmp(path, "/api/test/run") == 0 && strcmp(method, "POST") == 0) {
         api_run_tests(fd);
     } else if (strcmp(path, "/api/test/result") == 0) {
@@ -1189,11 +1423,25 @@ static void push_log_tail(const char *role, const char *path, long *offset) {
 
 static void push_status(void) {
     char msg[1024];
+    char protocol[128];
+    char transport[128];
+    char scenario[128];
+    char flow_id[128];
+    char session_id[128];
+    experiment_set_default_protocol();
+    json_escape_to(protocol, sizeof(protocol), state.experiment.protocol);
+    json_escape_to(transport, sizeof(transport), state.experiment.transport);
+    json_escape_to(scenario, sizeof(scenario), state.experiment.scenario);
+    json_escape_to(flow_id, sizeof(flow_id), state.experiment.flow_id);
+    json_escape_to(session_id, sizeof(session_id), state.experiment.session_id);
     snprintf(msg, sizeof(msg),
              "{\"type\":\"status\",\"server\":{\"running\":%s,\"result\":\"%s\"},"
-             "\"client\":{\"running\":%s,\"result\":\"%s\"}}",
+             "\"client\":{\"running\":%s,\"result\":\"%s\"},"
+             "\"experiment\":{\"protocol\":%s,\"transport\":%s,\"scenario\":%s,"
+             "\"flow_id\":%s,\"session_id\":%s}}",
              child_running(&state.server) ? "true" : "false", state.server.result,
-             child_running(&state.client) ? "true" : "false", state.client.result);
+             child_running(&state.client) ? "true" : "false", state.client.result,
+             protocol, transport, scenario, flow_id, session_id);
     websocket_send_text(msg);
 }
 
@@ -1233,6 +1481,7 @@ int main(int argc, char **argv) {
     ensure_runtime_dirs();
     child_init(&state.server, "server");
     child_init(&state.client, "client");
+    experiment_clear();
     state.ws_fd = -1;
     if (logger_open(&control_logger, "control", "logs/control.jsonl") != 0) {
         fprintf(stderr, "Cannot open control log\n");

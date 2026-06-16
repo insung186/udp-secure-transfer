@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "protocols": [
+    {
+      "id": "udp-basic",
+      "name": "UDP Basic",
+      "transport": "udp",
+      "schema": "/protocols/udp-basic/schema.json",
+      "scenarios": "/protocols/udp-basic/scenarios.json",
+      "defaultScenario": "normal"
+    },
+    {
+      "id": "udp-reliable",
+      "name": "Reliable UDP",
+      "transport": "udp",
+      "schema": "/protocols/udp-reliable/schema.json",
+      "scenarios": "/protocols/udp-reliable/scenarios.json",
+      "defaultScenario": "normal"
+    },
+    {
+      "id": "tcp-basic",
+      "name": "TCP Basic",
+      "transport": "tcp",
+      "schema": "/protocols/tcp-basic/schema.json",
+      "scenarios": "/protocols/tcp-basic/scenarios.json",
+      "defaultScenario": "normal"
+    },
+    {
+      "id": "tls-like",
+      "name": "TLS-like",
+      "transport": "tcp",
+      "schema": "/protocols/tls-like/schema.json",
+      "scenarios": "/protocols/tls-like/scenarios.json",
+      "defaultScenario": "normal"
+    },
+    {
+      "id": "http-basic",
+      "name": "HTTP Basic",
+      "transport": "tcp",
+      "schema": "/protocols/http-basic/schema.json",
+      "scenarios": "/protocols/http-basic/scenarios.json",
+      "defaultScenario": "normal"
+    },
+    {
+      "id": "websocket-basic",
+      "name": "WebSocket Basic",
+      "transport": "tcp",
+      "schema": "/protocols/websocket-basic/schema.json",
+      "scenarios": "/protocols/websocket-basic/scenarios.json",
+      "defaultScenario": "normal"
+    },
+    {
+      "id": "quic-like",
+      "name": "QUIC-like",
+      "transport": "udp",
+      "schema": "/protocols/quic-like/schema.json",
+      "scenarios": "/protocols/quic-like/scenarios.json",
+      "defaultScenario": "normal"
+    }
+  ]
+}

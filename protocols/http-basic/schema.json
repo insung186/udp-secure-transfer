@@ -1,0 +1,22 @@
+{
+  "id": "http-basic",
+  "name": "HTTP Basic",
+  "version": "2",
+  "transport": "tcp",
+  "summary": "真实 HTTP 请求/响应最小集，展示状态行、头部、body 与状态码语义。",
+  "transferView": "transaction",
+  "sequenceStages": ["STATUS_REQUEST", "STATUS_RESPONSE", "AUTH_REQUEST", "AUTH_RESPONSE", "UPLOAD_REQUEST", "UPLOAD_RESPONSE"],
+  "packetTypes": [
+    {"code": 30, "name": "STATUS_REQUEST"},
+    {"code": 31, "name": "STATUS_RESPONSE"},
+    {"code": 32, "name": "AUTH_REQUEST"},
+    {"code": 33, "name": "AUTH_RESPONSE"},
+    {"code": 34, "name": "UPLOAD_REQUEST"},
+    {"code": 35, "name": "UPLOAD_RESPONSE"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "method", "path",
+    "status_code", "header_summary", "payload_length", "bytes", "packet_uid", "wire_hex"
+  ]
+}

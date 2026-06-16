@@ -1,0 +1,9 @@
+{
+  "protocol": "websocket-basic",
+  "scenarios": [
+    {"id": "normal", "name": "正常升级与消息", "description": "完成 Upgrade 后收发文本、Ping/Pong，再进行 Close。"},
+    {"id": "bad-upgrade", "name": "错误 Upgrade", "description": "客户端发送错误 Upgrade 头部，握手失败。"},
+    {"id": "ping-timeout", "name": "Ping 超时", "description": "服务端发送 Ping，但客户端不返回 Pong。"},
+    {"id": "unexpected-close", "name": "异常关闭", "description": "服务端在发出文本帧后直接断开，演示未完成 Close 握手。"}
+  ]
+}

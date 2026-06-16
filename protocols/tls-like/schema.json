@@ -1,0 +1,27 @@
+{
+  "id": "tls-like",
+  "name": "TLS-like",
+  "version": "2",
+  "transport": "tcp",
+  "summary": "教学版安全握手：nonce 派生 session key，Finished 与 APP_DATA 用 HMAC 校验。",
+  "transferView": "file",
+  "sequenceStages": ["JOIN_REQ", "PASS_REQ", "PASS_RESP", "PASS_ACCEPT", "CLIENT_HELLO", "SERVER_HELLO", "FINISHED", "APP_DATA", "TERMINATE"],
+  "packetTypes": [
+    {"code": 1, "name": "JOIN_REQ"},
+    {"code": 2, "name": "PASS_REQ"},
+    {"code": 3, "name": "PASS_RESP"},
+    {"code": 4, "name": "PASS_ACCEPT"},
+    {"code": 20, "name": "CLIENT_HELLO"},
+    {"code": 21, "name": "SERVER_HELLO"},
+    {"code": 22, "name": "FINISHED"},
+    {"code": 23, "name": "APP_DATA"},
+    {"code": 6, "name": "TERMINATE"},
+    {"code": 7, "name": "REJECT"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "stream_offset",
+    "payload_length", "bytes", "security.encrypted", "security.mac_valid",
+    "security.replay", "security.handshake_phase", "packet_uid", "wire_hex"
+  ]
+}

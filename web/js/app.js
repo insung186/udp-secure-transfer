@@ -14,6 +14,12 @@ const appState = {
   activeTab: "dashboard",
   theme: "lab",
   language: "zh",
+  catalog: {protocols: []},
+  protocolSchemas: {},
+  scenarioCatalog: {},
+  selectedProtocol: "udp-basic",
+  selectedScenario: "normal",
+  compareProtocol: "",
   sidebarCollapsed: false,
   clientRunStartedAt: 0,
   clientRunLogIndex: 0,
@@ -80,14 +86,16 @@ const packetCodes = {
   DATA: 5,
   TERMINATE: 6,
   REJECT: 7,
+  ACK: 8,
+  NACK: 9,
 };
 
 const protocolStages = ["JOIN_REQ", "PASS_REQ", "PASS_RESP", "PASS_ACCEPT", "DATA", "TERMINATE"];
 
 const i18n = {
   zh: {
-    documentTitle: "UDP 安全传输实验台",
-    appName: "UDP 安全传输实验台",
+    documentTitle: "多协议教学演示平台",
+    appName: "多协议教学演示平台",
     console: "控制台",
     server: "服务端",
     client: "客户端",
@@ -109,6 +117,12 @@ const i18n = {
     sendPassword: "发送密码",
     startClient: "启动客户端",
     stopClient: "停止客户端",
+    protocolLab: "协议与场景",
+    platformHint: "平台化配置",
+    protocolSelect: "协议",
+    scenarioSelect: "场景",
+    scenarioDescription: "当前场景说明会显示在这里。",
+    runScenario: "运行场景",
     experimentControl: "实验控制",
     runHint: "运行",
     resetRun: "重置实验",
@@ -122,7 +136,7 @@ const i18n = {
     themeCyber: "赛博实验室",
     themeConsole: "深色控制台",
     themeSignal: "信号看板",
-    topTitle: "最小安全通信协议控制台",
+    topTitle: "统一多协议实验控制台",
     tabDashboard: "仪表盘",
     tabProtocol: "协议",
     tabTransfer: "传输",
@@ -162,8 +176,16 @@ const i18n = {
     time: "时间",
     direction: "方向",
     role: "角色",
+    protocolLabel: "协议",
+    transportLabel: "传输层",
+    scenarioLabel: "场景",
+    ackLabel: "ACK",
+    seqLabel: "SEQ",
+    windowLabel: "窗口",
+    retransmitLabel: "重传",
     packet: "包",
     flowId: "Flow ID",
+    sessionId: "Session ID",
     payload: "载荷",
     packetId: "分片 ID / 说明",
     state: "状态",
@@ -365,8 +387,8 @@ const i18n = {
     clientStartFailed: "客户端启动失败。",
   },
   en: {
-    documentTitle: "Secure UDP Transfer Lab",
-    appName: "Secure UDP Transfer Lab",
+    documentTitle: "Multi-Protocol Teaching Lab",
+    appName: "Multi-Protocol Teaching Lab",
     console: "Console",
     server: "Server",
     client: "Client",
@@ -388,6 +410,12 @@ const i18n = {
     sendPassword: "Send password",
     startClient: "Start client",
     stopClient: "Stop client",
+    protocolLab: "Protocol & scenario",
+    platformHint: "Platform config",
+    protocolSelect: "Protocol",
+    scenarioSelect: "Scenario",
+    scenarioDescription: "The selected scenario description appears here.",
+    runScenario: "Run scenario",
     experimentControl: "Experiment control",
     runHint: "Run",
     resetRun: "Reset run",
@@ -401,7 +429,7 @@ const i18n = {
     themeCyber: "Cyber Lab",
     themeConsole: "Console Dark",
     themeSignal: "Signal Board",
-    topTitle: "Minimal Secure Protocol Console",
+    topTitle: "Unified Multi-Protocol Console",
     tabDashboard: "Dashboard",
     tabProtocol: "Protocol",
     tabTransfer: "Transfer",
@@ -441,8 +469,16 @@ const i18n = {
     time: "Time",
     direction: "Direction",
     role: "Role",
+    protocolLabel: "Protocol",
+    transportLabel: "Transport",
+    scenarioLabel: "Scenario",
+    ackLabel: "ACK",
+    seqLabel: "SEQ",
+    windowLabel: "Window",
+    retransmitLabel: "Retransmit",
     packet: "Packet",
     flowId: "Flow ID",
+    sessionId: "Session ID",
     payload: "Payload",
     packetId: "Fragment ID / Note",
     state: "State",
@@ -863,6 +899,166 @@ function localizeError(message) {
   return text;
 }
 
+function protocolOptions() {
+  return Array.isArray(appState.catalog?.protocols) ? appState.catalog.protocols : [];
+}
+
+function currentProtocolDef() {
+  const protocols = protocolOptions();
+  return protocols.find((item) => item.id === appState.selectedProtocol) || protocols[0] || null;
+}
+
+function protocolDisplayName(protocolId) {
+  const found = protocolOptions().find((item) => item.id === protocolId);
+  return found?.name || protocolId || "-";
+}
+
+function currentScenarioList() {
+  return appState.scenarioCatalog[appState.selectedProtocol]?.scenarios || [];
+}
+
+function currentScenarioDef() {
+  const scenarios = currentScenarioList();
+  return scenarios.find((item) => item.id === appState.selectedScenario) || scenarios[0] || null;
+}
+
+function scenarioDisplayName(scenarioId, protocolId = appState.selectedProtocol) {
+  const scenarios = appState.scenarioCatalog[protocolId]?.scenarios || [];
+  const found = scenarios.find((item) => item.id === scenarioId);
+  return found?.name || scenarioId || "-";
+}
+
+function protocolPacketTypes() {
+  return appState.protocolSchemas[appState.selectedProtocol]?.packetTypes || [];
+}
+
+function protocolSequenceStages() {
+  return appState.protocolSchemas[appState.selectedProtocol]?.sequenceStages || protocolStages;
+}
+
+function protocolSchema(protocolId = appState.selectedProtocol) {
+  return appState.protocolSchemas[protocolId] || {};
+}
+
+function protocolTransferView(protocolId = appState.selectedProtocol) {
+  return protocolSchema(protocolId)?.transferView || "file";
+}
+
+function protocolSummary(protocolId = appState.selectedProtocol) {
+  return protocolSchema(protocolId)?.summary || "";
+}
+
+function primaryPacketNamesForProtocol(protocolId = appState.selectedProtocol) {
+  const view = protocolTransferView(protocolId);
+  if (view === "transaction") return ["STATUS_RESPONSE", "AUTH_RESPONSE", "UPLOAD_RESPONSE"];
+  if (view === "message") return ["TEXT"];
+  return ["DATA", "APP_DATA", "STREAM"];
+}
+
+function flowTransferEntries(flowPackets, protocolId, role) {
+  const names = new Set(primaryPacketNamesForProtocol(protocolId));
+  return flowPackets.filter((entry) => entry.role === role && names.has(entry.packet_type));
+}
+
+function flowTimelineEntries(flowPackets, protocolId) {
+  const view = protocolTransferView(protocolId);
+  if (view === "transaction") {
+    return flowPackets.filter((entry) => /REQUEST|RESPONSE/.test(entry.packet_type || ""));
+  }
+  if (view === "message") {
+    return flowPackets.filter((entry) =>
+      ["UPGRADE_REQUEST", "UPGRADE_RESPONSE", "TEXT", "PING", "PONG", "CLOSE"].includes(entry.packet_type)
+    );
+  }
+  return flowPackets.filter((entry) =>
+    ["DATA", "APP_DATA", "STREAM", "ACK", "NACK", "TERMINATE", "CLOSE"].includes(entry.packet_type)
+  );
+}
+
+function uniqueTransferEntries(entries) {
+  const seen = new Set();
+  const unique = [];
+  for (const entry of entries) {
+    const key = entry.packet_uid || `${entry.packet_type}:${entry.packet_id ?? entry.seq ?? entry.time ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(entry);
+  }
+  return unique;
+}
+
+function deriveFlowPhase(flowLogs, flowPackets, protocolId, result) {
+  const primaryRecv = flowTransferEntries(flowPackets, protocolId, "client");
+  const packetNames = new Set(flowLogs.map((entry) => entry.packet_type).filter(Boolean));
+  if (result === "ABORT") return "ABORT";
+  if (flowLogs.some((entry) => entry.event === "DIGEST_MATCH") || result === "OK") return "DONE";
+  if (packetNames.has("TERMINATE") || packetNames.has("CLOSE")) return "VERIFY";
+  if (primaryRecv.length > 0) return "DATA_TRANSFER";
+  if (["PASS_REQ", "PASS_RESP", "PASS_ACCEPT", "REJECT", "CLIENT_HELLO", "SERVER_HELLO", "FINISHED",
+       "AUTH_REQUEST", "AUTH_RESPONSE", "HANDSHAKE", "HANDSHAKE_ACK", "UPGRADE_REQUEST", "UPGRADE_RESPONSE"].some((name) => packetNames.has(name))) {
+    return "AUTH";
+  }
+  if (["JOIN_REQ", "INITIAL", "STATUS_REQUEST"].some((name) => packetNames.has(name))) {
+    return "JOIN";
+  }
+  return "INIT";
+}
+
+function syncProtocolSelectors() {
+  const protocolSelect = byId("protocol-select");
+  const scenarioSelect = byId("scenario-select");
+  const scenarioDescription = byId("scenario-description");
+  const protocols = protocolOptions();
+  const currentProtocol = currentProtocolDef();
+  if (protocolSelect) {
+    protocolSelect.innerHTML = protocols.map((item) =>
+      `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name || item.id)}</option>`
+    ).join("");
+    protocolSelect.value = currentProtocol?.id || "";
+  }
+  const scenarios = currentScenarioList();
+  const currentScenario = currentScenarioDef();
+  if (scenarioSelect) {
+    scenarioSelect.innerHTML = scenarios.map((item) =>
+      `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name || item.id)}</option>`
+    ).join("");
+    scenarioSelect.value = currentScenario?.id || "";
+  }
+  if (scenarioDescription) {
+    scenarioDescription.textContent = currentScenario?.description || t("scenarioDescription");
+  }
+}
+
+async function loadProtocolCatalog() {
+  try {
+    const catalog = await window.Api.catalog();
+    if (!catalog || !Array.isArray(catalog.protocols)) return;
+    appState.catalog = catalog;
+    if (!protocolOptions().some((item) => item.id === appState.selectedProtocol)) {
+      appState.selectedProtocol = protocolOptions()[0]?.id || "udp-basic";
+    }
+    for (const item of protocolOptions()) {
+      if (item.schema && !appState.protocolSchemas[item.id]) {
+        appState.protocolSchemas[item.id] = await window.Api.protocolResource(item.schema);
+      }
+      if (item.scenarios && !appState.scenarioCatalog[item.id]) {
+        appState.scenarioCatalog[item.id] = await window.Api.protocolResource(item.scenarios);
+      }
+    }
+    const protocol = currentProtocolDef();
+    const scenarios = appState.scenarioCatalog[protocol?.id || ""]?.scenarios || [];
+    if (!scenarios.some((item) => item.id === appState.selectedScenario)) {
+      appState.selectedScenario = protocol?.defaultScenario || scenarios[0]?.id || "normal";
+    }
+    if (!appState.compareProtocol || appState.compareProtocol === appState.selectedProtocol) {
+      appState.compareProtocol = protocolOptions().find((item) => item.id !== appState.selectedProtocol)?.id || appState.selectedProtocol;
+    }
+    syncProtocolSelectors();
+  } catch (error) {
+    console.warn(error);
+  }
+}
+
 function logKey(entry) {
   return [
     entry.time,
@@ -927,11 +1123,14 @@ function ensureFlowIds() {
   let lastEventFinal = null;
 
   appState.logs.forEach((entry) => {
-    if (entry.flow_id && /^flow-\d{4}-/.test(entry.flow_id)) {
+    if (entry.flow_id) {
       const port = String(entry.port || peerPort(entry.peer) || "");
       if (entry.role === "server" && entry.event === "SERVER_START" && port) {
         serverFlowsByPort.set(port, entry.flow_id);
         activeServerFlow = entry.flow_id;
+      }
+      if (!entry.session_id) {
+        entry.session_id = entry.flow_id;
       }
       if (entry.event === "FINAL_OK" || entry.event === "FINAL_ABORT") {
         lastEventFinal = entry;
@@ -1092,28 +1291,33 @@ function deriveRun() {
   if (finalEvent && finalEvent.flow_id === flowId) {
     appState.lastFlowResult = finalEvent.result || (finalEvent.event === "FINAL_OK" ? "OK" : "ABORT");
   }
-  const hasAbort = result === "ABORT" || flowLogs.some((entry) => entry.level === "ERROR" || entry.level === "ABORT");
-  let phase = "INIT";
-  if (hasAbort && result === "ABORT") phase = "ABORT";
-  else if (flowLatest((entry) => entry.event === "DIGEST_MATCH")) phase = "DONE";
-  else if (flowLatest((entry) => entry.packet_type === "TERMINATE")) phase = "VERIFY";
-  else if (flowLatest((entry) => entry.packet_type === "DATA")) phase = "DATA_TRANSFER";
-  else if (flowLatest((entry) => ["PASS_REQ", "PASS_RESP", "PASS_ACCEPT", "REJECT"].includes(entry.packet_type))) phase = "AUTH";
-  else if (flowLatest((entry) => entry.packet_type === "JOIN_REQ")) phase = "JOIN";
-  appState.lastFlowPhase = phase;
-
   const serverDigest = flowLatest((entry) => entry.event === "SERVER_DIGEST" && entry.sha1);
   const clientDigest = flowLatest((entry) => (entry.event === "DIGEST_MATCH" || entry.event === "DIGEST_MISMATCH") && entry.sha1);
-  const dataRecv = flowPackets.filter((entry) => entry.role === "client" && entry.packet_type === "DATA");
-  const dataSent = flowPackets.filter((entry) => entry.role === "server" && entry.packet_type === "DATA");
+  const protocolId = flowLatest((entry) => entry.protocol)?.protocol
+    || appState.status.experiment?.protocol
+    || appState.selectedProtocol;
+  const dataRecv = flowTransferEntries(flowPackets, protocolId, "client");
+  const dataSent = flowTransferEntries(flowPackets, protocolId, "server");
+  const dataRecvUnique = uniqueTransferEntries(dataRecv);
+  const dataSentUnique = uniqueTransferEntries(dataSent);
   const inputStart = flowLatest((entry) => entry.event === "SERVER_START");
-  const receivedBytes = dataRecv.reduce((sum, entry) => sum + Number(entry.bytes || entry.payload_length || 0), 0);
-  const sentBytes = dataSent.reduce((sum, entry) => sum + Number(entry.bytes || entry.payload_length || 0), 0);
-  const totalBytes = Number(inputStart?.bytes || Math.max(receivedBytes, sentBytes, 0));
+  const flowMeta = flowLatest((entry) => entry.protocol || entry.transport || entry.session_id || entry.scenario);
+  const phase = deriveFlowPhase(flowLogs, flowPackets, protocolId, result);
+  appState.lastFlowPhase = phase;
+  const ackCount = flowLogs.filter((entry) => entry.packet_type === "ACK").length;
+  const nackCount = flowLogs.filter((entry) => entry.packet_type === "NACK").length;
+  const retransmits = flowLogs.filter((entry) =>
+    String(entry.event || "").includes("RETRANSMIT") || Number(entry.retransmit_count || 0) > 0
+  ).length;
+  const receivedBytes = dataRecvUnique.reduce((sum, entry) => sum + Number(entry.bytes || entry.payload_length || 0), 0);
+  const sentBytes = dataSentUnique.reduce((sum, entry) => sum + Number(entry.bytes || entry.payload_length || 0), 0);
+  const totalBytes = protocolTransferView(protocolId) === "file"
+    ? Number(inputStart?.bytes || Math.max(receivedBytes, sentBytes, 0))
+    : Math.max(receivedBytes, sentBytes, 0);
   const attempts = Math.max(0, ...flowLogs.map((entry) => Number(entry.attempt || 0)));
   const progress = totalBytes > 0 ? Math.min(100, Math.round((receivedBytes / totalBytes) * 100)) : result === "OK" ? 100 : 0;
-  const firstData = dataRecv[0];
-  const lastData = dataRecv[dataRecv.length - 1];
+  const firstData = dataRecvUnique[0];
+  const lastData = dataRecvUnique[dataRecvUnique.length - 1];
   let throughput = 0;
   if (firstData && lastData) {
     const start = new Date(firstData.time).getTime();
@@ -1136,6 +1340,15 @@ function deriveRun() {
     totalBytes,
     progress,
     throughput,
+    ackCount,
+    nackCount,
+    retransmits,
+    protocol: protocolId,
+    transport: flowMeta?.transport || appState.status.experiment?.transport || currentProtocolDef()?.transport || "udp",
+    scenario: flowMeta?.scenario || appState.status.experiment?.scenario || currentScenarioDef()?.name || appState.selectedScenario,
+    sessionId: flowMeta?.session_id || appState.status.experiment?.session_id || "",
+    transferView: protocolTransferView(protocolId),
+    timelineEntries: flowTimelineEntries(flowPackets, protocolId),
     finalEvent,
     flowId,
   };
@@ -1153,6 +1366,22 @@ function deriveRun() {
  * 入参是 deriveRun() 返回值（含 dataRecv / dataSent）。
  */
 function computeTransferStats(run) {
+  if ((run.transferView || protocolTransferView(run.protocol)) !== "file") {
+    return {
+      expectedCount: run.timelineEntries?.length || run.dataSent.length || 0,
+      receivedCount: run.dataRecv.length,
+      sentCount: run.dataSent.length,
+      lostCount: 0,
+      dupCount: 0,
+      oofCount: 0,
+      lostIds: new Set(),
+      dupIds: new Set(),
+      oofIds: new Set(),
+      pendingIds: new Set(),
+      recvIds: new Set(),
+      sentIds: new Set(),
+    };
+  }
   const sentIds = new Set();
   let maxSentId = -1;
   for (const e of (run.dataSent || [])) {
@@ -1279,7 +1508,8 @@ function collectFlowHistory() {
     else if (entry.event === "FINAL_ABORT") f.result = "ABORT";
     else if (entry.event === "AUTH_FAIL") f.result = f.result || "AUTH_FAIL";
     else if (entry.event === "TIMEOUT") f.result = f.result || "TIMEOUT";
-    if (entry.event === "AUTH_SUCCESS") f.scenario = "OK";
+    if (entry.scenario) f.scenario = entry.scenario;
+    else if (entry.event === "AUTH_SUCCESS") f.scenario = "normal";
   }
   const arr = Array.from(flows.values()).sort(
     (a, b) => String(b.firstTime).localeCompare(String(a.firstTime))
@@ -1331,6 +1561,14 @@ function packetIdentifier(entry) {
         : "PASS_RESP has no packet_id. This shows the redacted password payload length.",
     };
   }
+  if ((entry.packet_type === "ACK" || entry.packet_type === "NACK") && entry.ack !== undefined) {
+    return {
+      text: `ack ${entry.ack}`,
+      title: appState.language === "zh"
+        ? "反馈包中的累计确认序号 / 缺失分片序号"
+        : "Cumulative ACK or missing fragment sequence in the feedback packet.",
+    };
+  }
   return {
     text: "-",
     title: t("noPacketId"),
@@ -1351,7 +1589,7 @@ function packetTypeClass(type) {
 function packetStage(type) {
   if (type === "JOIN_REQ") return "control";
   if (["PASS_REQ", "PASS_RESP", "PASS_ACCEPT"].includes(type)) return "auth";
-  if (type === "DATA") return "data";
+  if (type === "DATA" || type === "ACK" || type === "NACK") return "data";
   if (["TERMINATE", "REJECT"].includes(type)) return "final";
   return "control";
 }
@@ -1640,6 +1878,7 @@ function setLanguage(language, rerender = true) {
     console.warn(error);
   }
   applyLanguage();
+  syncProtocolSelectors();
   // 主题卡片标签随语言刷新
   if (window.ThemeManager && typeof window.ThemeManager.refreshLabels === "function") {
     window.ThemeManager.refreshLabels(appState.language);
@@ -1686,8 +1925,9 @@ function updateTopbar(run) {
 
 function renderPhases(run) {
   const completed = new Set(appState.packets.map((entry) => entry.packet_type));
-  const current = protocolStages.find((stage) => !completed.has(stage));
-  return protocolStages.map((stage) => {
+  const stages = protocolSequenceStages();
+  const current = stages.find((stage) => !completed.has(stage));
+  return stages.map((stage) => {
     const status = run.result === "ABORT" && stage === current ? "fail" : completed.has(stage) ? "done" : stage === current ? "current" : "";
     return `
       <div class="phase-step ${status}">
@@ -1710,10 +1950,14 @@ function renderDashboard(run) {
   byId("metrics-panel").innerHTML = `
     <div class="panel-head"><h2>${t("transferSummary")}</h2><span class="hint">${run.progress}%</span></div>
     <div class="metric-grid">
+      <div class="metric"><span>${t("protocolLabel")}</span><strong>${escapeHtml(protocolDisplayName(run.protocol || appState.selectedProtocol))}</strong></div>
+      <div class="metric"><span>${t("scenarioLabel")}</span><strong>${escapeHtml(scenarioDisplayName(run.scenario || appState.selectedScenario, run.protocol || appState.selectedProtocol))}</strong></div>
       <div class="metric"><span>${t("received")}</span><strong>${formatBytes(run.receivedBytes)}</strong></div>
       <div class="metric"><span>${t("total")}</span><strong>${formatBytes(run.totalBytes)}</strong></div>
       <div class="metric"><span>${t("dataPackets")}</span><strong>${run.dataRecv.length}</strong></div>
       <div class="metric"><span>${t("attempts")}</span><strong>${run.attempts}/3</strong></div>
+      <div class="metric"><span>${t("ackLabel")}</span><strong>${run.ackCount}</strong></div>
+      <div class="metric"><span>${t("retransmitLabel")}</span><strong>${run.retransmits}</strong></div>
     </div>
   `;
   byId("digest-panel").innerHTML = digestMarkup(run, t("sha1Digest"));
@@ -1722,6 +1966,56 @@ function renderDashboard(run) {
     ? appState.logs.filter((e) => e.flow_id === appState.currentFlowId)
     : [];
   renderLogList(byId("recent-logs"), flowLogs.slice(-8), true);
+}
+
+function renderProtocolSummaryCard(run) {
+  const node = byId("protocol-summary-panel");
+  if (!node) return;
+  const currentId = run.protocol || appState.selectedProtocol;
+  const current = protocolOptions().find((item) => item.id === currentId) || currentProtocolDef();
+  const compareOptions = protocolOptions().filter((item) => item.id !== currentId);
+  if (!compareOptions.some((item) => item.id === appState.compareProtocol)) {
+    appState.compareProtocol = compareOptions[0]?.id || currentId;
+  }
+  const compare = protocolOptions().find((item) => item.id === appState.compareProtocol) || null;
+  const currentStages = (protocolSchema(currentId).sequenceStages || []).join(" -> ");
+  const compareStages = compare ? (protocolSchema(compare.id).sequenceStages || []).join(" -> ") : "";
+  node.innerHTML = `
+    <div class="panel-head">
+      <h2>${escapeHtml(appState.language === "zh" ? "当前协议摘要" : "Protocol summary")}</h2>
+      <span class="hint">${escapeHtml(appState.language === "zh" ? "统一实验台 / 协议画像" : "Unified lab / protocol profile")}</span>
+    </div>
+    <div class="metric-grid">
+      <div class="metric"><span>${t("protocolLabel")}</span><strong>${escapeHtml(current?.name || currentId)}</strong></div>
+      <div class="metric"><span>${t("transportLabel")}</span><strong>${escapeHtml(current?.transport || run.transport || "-")}</strong></div>
+      <div class="metric"><span>${t("scenarioLabel")}</span><strong>${escapeHtml(scenarioDisplayName(run.scenario || appState.selectedScenario, currentId))}</strong></div>
+      <div class="metric"><span>${escapeHtml(appState.language === "zh" ? "视图" : "View")}</span><strong>${escapeHtml(protocolTransferView(currentId))}</strong></div>
+    </div>
+    <p class="protocol-summary-copy">${escapeHtml(protocolSummary(currentId) || current?.name || currentId)}</p>
+    <p class="protocol-summary-copy">${escapeHtml(currentScenarioDef()?.description || "")}</p>
+    <div class="protocol-stage-line"><span>${escapeHtml(appState.language === "zh" ? "时序阶段" : "Sequence")}</span><code>${escapeHtml(currentStages || "-")}</code></div>
+    <div class="protocol-compare-row">
+      <label>
+        <span class="label-text">${escapeHtml(appState.language === "zh" ? "对比协议" : "Compare protocol")}</span>
+        <select id="compare-protocol-select">
+          ${compareOptions.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name || item.id)}</option>`).join("")}
+        </select>
+      </label>
+      ${compare ? `<div class="protocol-compare-card">
+        <strong>${escapeHtml(compare.name || compare.id)}</strong>
+        <span>${escapeHtml(compare.transport || "-")} · ${escapeHtml(protocolTransferView(compare.id))}</span>
+        <code>${escapeHtml(compareStages || "-")}</code>
+      </div>` : ""}
+    </div>
+  `;
+  const select = byId("compare-protocol-select");
+  if (select) {
+    select.value = appState.compareProtocol;
+    select.onchange = (event) => {
+      appState.compareProtocol = event.currentTarget.value || currentId;
+      renderProtocolSummaryCard(run);
+    };
+  }
 }
 
 function digestMarkup(run, title) {
@@ -1744,8 +2038,12 @@ function renderConfig(run) {
     <div class="panel-head"><h2>${t("runStatus")}</h2><span class="hint">${t("httpWs")}</span></div>
     ${appState.notice ? `<div class="notice danger">${escapeHtml(appState.notice)}</div>` : ""}
     <div class="metric-grid">
+      <div class="metric"><span>${t("protocolLabel")}</span><strong>${escapeHtml(protocolDisplayName(run.protocol || appState.selectedProtocol))}</strong></div>
+      <div class="metric"><span>${t("scenarioLabel")}</span><strong>${escapeHtml(scenarioDisplayName(run.scenario || appState.selectedScenario, run.protocol || appState.selectedProtocol))}</strong></div>
       <div class="metric"><span>${t("serverPid")}</span><strong>${escapeHtml(appState.status.server?.pid || "-")}</strong></div>
       <div class="metric"><span>${t("clientPid")}</span><strong>${escapeHtml(appState.status.client?.pid || "-")}</strong></div>
+      <div class="metric"><span>${t("sessionId")}</span><strong class="mono">${escapeHtml(run.sessionId || appState.status.experiment?.session_id || "-")}</strong></div>
+      <div class="metric"><span>${t("transportLabel")}</span><strong>${escapeHtml(run.transport || "udp")}</strong></div>
       <div class="metric"><span>${t("phase")}</span><strong>${phaseLabel(appState.currentFlowId ? run.phase : "INIT")}</strong></div>
       <div class="metric"><span>${t("result")}</span><strong>${resultLabel(displayResult)}</strong></div>
     </div>
@@ -2020,15 +2318,32 @@ function renderInspector() {
   // TERMINATE 的 SHA1、PASS_RESP 的脱敏提示）。
   const mainRows = [
     {label: t("packet"), value: escapeHtml(packet.packet_type)},
+    {label: t("protocolLabel"), value: escapeHtml(protocolDisplayName(packet.protocol || appState.status.experiment?.protocol || appState.selectedProtocol))},
     {label: t("flowId"), value: escapeHtml(packet.flow_id || "-"), mono: true},
+    {label: t("sessionId"), value: escapeHtml(packet.session_id || appState.status.experiment?.session_id || "-"), mono: true},
     {label: t("packetUid"), value: escapeHtml(packet.packet_uid || "-"), mono: true},
+    {label: t("scenarioLabel"), value: escapeHtml(scenarioDisplayName(packet.scenario || appState.status.experiment?.scenario || appState.selectedScenario, packet.protocol || appState.status.experiment?.protocol || appState.selectedProtocol))},
     {label: t("direction"), value: escapeHtml(packetDirectionText(packet))},
     {label: t("typeCode"), value: String(packetCodes[packet.packet_type] || packet.packet_code || "?")},
     {label: t("payloadLength"), value: `${escapeHtml(packet.payload_length ?? 0)} B`},
     {label: t("packetId"), value: escapeHtml(packetIdentifier(packet).text), title: escapeHtml(packetIdentifier(packet).title)},
     {label: t("state"), value: escapeHtml(packet.state || "-")},
     {label: t("time"), value: escapeHtml(packet.time), mono: true},
-  ];
+  ].concat(
+    packet.seq !== undefined && packet.seq !== null ? [{label: t("seqLabel"), value: escapeHtml(packet.seq), mono: true}] : [],
+    packet.ack !== undefined && packet.ack !== null ? [{label: t("ackLabel"), value: escapeHtml(packet.ack), mono: true}] : [],
+    packet.window_size !== undefined && packet.window_size !== null ? [{label: t("windowLabel"), value: escapeHtml(packet.window_size), mono: true}] : [],
+    packet.retransmit_count !== undefined && packet.retransmit_count !== null ? [{label: t("retransmitLabel"), value: escapeHtml(packet.retransmit_count), mono: true}] : [],
+    packet.stream_offset !== undefined && packet.stream_offset !== null ? [{label: "stream_offset", value: escapeHtml(packet.stream_offset), mono: true}] : [],
+    packet.connection_id ? [{label: "connection_id", value: escapeHtml(packet.connection_id), mono: true}] : [],
+    packet.stream_id !== undefined && packet.stream_id !== null ? [{label: "stream_id", value: escapeHtml(packet.stream_id), mono: true}] : [],
+    packet.method ? [{label: "method", value: escapeHtml(packet.method)}] : [],
+    packet.path ? [{label: "path", value: escapeHtml(packet.path), mono: true}] : [],
+    packet.status_code !== undefined && packet.status_code !== null ? [{label: "status", value: escapeHtml(packet.status_code), mono: true}] : [],
+    packet.header_summary ? [{label: "headers", value: escapeHtml(packet.header_summary), mono: true}] : [],
+    packet.frame_type ? [{label: "frame_type", value: escapeHtml(packet.frame_type)}] : [],
+    packet.security ? [{label: "security", value: escapeHtml(JSON.stringify(packet.security)), mono: true}] : []
+  );
   const wireExtras = parsePacketFields(packet);
   byId("packet-inspector").innerHTML = `
     <div class="field-list">
@@ -2109,10 +2424,11 @@ function scopeRunToFlow(run, flowId) {
   const flowLogs = appState.logs.filter((e) => e.flow_id === flowId);
   /* 关键：用 allPackets，保留 client / server 两端记录。*/
   const flowPackets = appState.allPackets.filter((e) => e.flow_id === flowId);
-  const dataRecv = flowPackets.filter((e) => e.role === "client" && e.packet_type === "DATA");
-  const dataSent = flowPackets.filter((e) => e.role === "server" && e.packet_type === "DATA");
-  const receivedBytes = dataRecv.reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
-  const sentBytes = dataSent.reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
+  const protocolId = [...flowLogs].reverse().find((e) => e.protocol)?.protocol || run.protocol || appState.selectedProtocol;
+  const dataRecv = flowTransferEntries(flowPackets, protocolId, "client");
+  const dataSent = flowTransferEntries(flowPackets, protocolId, "server");
+  const receivedBytes = uniqueTransferEntries(dataRecv).reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
+  const sentBytes = uniqueTransferEntries(dataSent).reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
   const finalEvent = [...flowLogs].reverse().find(
     (e) => e.event === "FINAL_OK" || e.event === "FINAL_ABORT"
   );
@@ -2120,7 +2436,9 @@ function scopeRunToFlow(run, flowId) {
     ? (finalEvent.result || (finalEvent.event === "FINAL_OK" ? "OK" : "ABORT"))
     : "Pending";
   const inputStart = [...flowLogs].reverse().find((e) => e.event === "SERVER_START");
-  const totalBytes = Number(inputStart?.bytes || Math.max(receivedBytes, sentBytes, 0));
+  const totalBytes = protocolTransferView(protocolId) === "file"
+    ? Number(inputStart?.bytes || Math.max(receivedBytes, sentBytes, 0))
+    : Math.max(receivedBytes, sentBytes, 0);
   const progress = totalBytes > 0
     ? Math.min(100, Math.round((receivedBytes / totalBytes) * 100))
     : (result === "OK" ? 100 : 0);
@@ -2132,13 +2450,7 @@ function scopeRunToFlow(run, flowId) {
     const end = new Date(lastData.time).getTime();
     throughput = receivedBytes / Math.max(1, end - start) * 1000;
   }
-  let phase = "INIT";
-  if (result === "ABORT") phase = "ABORT";
-  else if (flowLogs.some((e) => e.event === "DIGEST_MATCH")) phase = "DONE";
-  else if (flowLogs.some((e) => e.packet_type === "TERMINATE")) phase = "VERIFY";
-  else if (dataRecv.length > 0) phase = "DATA_TRANSFER";
-  else if (flowLogs.some((e) => ["PASS_REQ","PASS_RESP","PASS_ACCEPT","REJECT"].includes(e.packet_type))) phase = "AUTH";
-  else if (flowLogs.some((e) => e.packet_type === "JOIN_REQ")) phase = "JOIN";
+  const phase = deriveFlowPhase(flowLogs, flowPackets, protocolId, result);
   const attempts = Math.max(0, ...flowLogs.map((e) => Number(e.attempt || 0)));
   const serverDigest = [...flowLogs].reverse().find((e) => e.event === "SERVER_DIGEST" && e.sha1);
   const clientDigest = [...flowLogs].reverse().find(
@@ -2160,6 +2472,9 @@ function scopeRunToFlow(run, flowId) {
     serverDigest: serverDigest?.sha1 || "",
     clientDigest: clientDigest?.sha1 || "",
     digestMatch: Boolean(clientDigest && clientDigest.event === "DIGEST_MATCH"),
+    protocol: protocolId,
+    transferView: protocolTransferView(protocolId),
+    timelineEntries: flowTimelineEntries(flowPackets, protocolId),
   };
 }
 
@@ -2201,7 +2516,19 @@ function renderTransferHero(run, flowId) {
   /* 文件路径：server input + client output。Sidebar 表单里保存的最新值。 */
   const serverInput = byId("server-input-path")?.value || "—";
   const clientOutput = byId("client-output-path")?.value || "—";
-  if (filesNode) filesNode.textContent = t("transferHeroFiles", {server: serverInput, client: clientOutput});
+  if (filesNode) {
+    if ((run.transferView || protocolTransferView(run.protocol)) === "file") {
+      filesNode.textContent = t("transferHeroFiles", {server: serverInput, client: clientOutput});
+    } else if ((run.transferView || protocolTransferView(run.protocol)) === "transaction") {
+      filesNode.textContent = appState.language === "zh"
+        ? `请求 / 响应事务 · 输出 ${clientOutput}`
+        : `Request/response transactions · output ${clientOutput}`;
+    } else {
+      filesNode.textContent = appState.language === "zh"
+        ? `消息 / 帧演示 · 输出 ${clientOutput}`
+        : `Message/frame demo · output ${clientOutput}`;
+    }
+  }
 
   /* 时长 + 总大小 */
   const flowLogs = appState.logs.filter((e) => e.flow_id === flowId);
@@ -2224,9 +2551,14 @@ function renderTransferHero(run, flowId) {
   const heroStats = byId("transfer-hero-stats");
   if (heroStats) {
     heroStats.innerHTML = `
+      <div class="metric"><span>${t("protocolLabel")}</span><strong>${escapeHtml(protocolDisplayName(run.protocol || appState.selectedProtocol))}</strong></div>
+      <div class="metric"><span>${t("scenarioLabel")}</span><strong>${escapeHtml(scenarioDisplayName(run.scenario || appState.selectedScenario, run.protocol || appState.selectedProtocol))}</strong></div>
       <div class="metric"><span>Flow</span><strong class="mono">${escapeHtml(flowId)}</strong></div>
-      <div class="metric"><span>${t("attempts")}</span><strong>${run.attempts}/3</strong></div>
+      <div class="metric"><span>${t("sessionId")}</span><strong class="mono">${escapeHtml(run.sessionId || appState.status.experiment?.session_id || "-")}</strong></div>
+      <div class="metric"><span>${t("attempts")}</span><strong>${run.attempts || 0}${run.attempts ? "/3" : ""}</strong></div>
       <div class="metric"><span>${t("dataPackets")}</span><strong>${run.dataRecv.length}</strong></div>
+      <div class="metric"><span>${t("ackLabel")}</span><strong>${run.ackCount}</strong></div>
+      <div class="metric"><span>${t("retransmitLabel")}</span><strong>${run.retransmits}</strong></div>
       <div class="metric"><span>${t("result")}</span><strong>${resultLabel(run.result)}</strong></div>
     `;
   }
@@ -2290,6 +2622,17 @@ function renderProgress(run, stats) {
 
   const statsNode = byId("transfer-stats");
   if (!statsNode) return;
+  if ((run.transferView || protocolTransferView(run.protocol)) !== "file") {
+    statsNode.innerHTML = `
+      <div class="metric"><span>${t("progress")}</span><strong>${run.progress}%</strong></div>
+      <div class="metric"><span>${t("received")}</span><strong>${formatBytes(run.receivedBytes)}</strong></div>
+      <div class="metric"><span>${t("sent")}</span><strong>${formatBytes(run.sentBytes)}</strong></div>
+      <div class="metric"><span>${appState.language === "zh" ? "步骤数" : "Steps"}</span><strong>${run.timelineEntries?.length || 0}</strong></div>
+      <div class="metric"><span>${t("ackLabel")}</span><strong>${run.ackCount}</strong></div>
+      <div class="metric"><span>${t("retransmitLabel")}</span><strong>${run.retransmits}</strong></div>
+    `;
+    return;
+  }
   statsNode.innerHTML = `
     <div class="metric"><span>${t("progress")}</span><strong>${run.progress}%</strong></div>
     <div class="metric"><span>${t("received")}</span><strong>${formatBytes(run.receivedBytes)} / ${formatBytes(run.totalBytes)}</strong></div>
@@ -2393,6 +2736,30 @@ function renderFragmentMatrix(run, stats) {
   const summary = byId("matrix-summary");
   const legend = byId("matrix-legend");
   if (!matrix) return;
+  if ((run.transferView || protocolTransferView(run.protocol)) !== "file") {
+    const entries = run.timelineEntries || [];
+    if (summary) {
+      summary.innerHTML = `<span class="matrix-summary-text">${
+        escapeHtml(appState.language === "zh" ? `记录 ${entries.length} 个事务 / 消息步骤` : `${entries.length} transaction/message steps`)
+      }</span>`;
+    }
+    if (legend) {
+      legend.innerHTML = "";
+    }
+    matrix.classList.remove("show-time");
+    matrix.classList.add("protocol-event-list");
+    matrix.innerHTML = entries.length
+      ? entries.map((entry) => `
+          <div class="protocol-event-row">
+            <div><strong>${escapeHtml(entry.packet_type || "-")}</strong><span class="hint">${escapeHtml(packetDirectionText(entry))}</span></div>
+            <div class="mono">${escapeHtml(entry.method || entry.frame_type || entry.path || entry.connection_id || "-")}</div>
+            <div class="mono">${escapeHtml(entry.path || (entry.status_code ?? entry.stream_id ?? "-"))}</div>
+          </div>
+        `).join("")
+      : `<p class="inspector-empty matrix-empty">${escapeHtml(appState.language === "zh" ? "当前协议还没有事务 / 消息记录。" : "No transaction/message records yet.")}</p>`;
+    return;
+  }
+  matrix.classList.remove("protocol-event-list");
 
   /* 摘要 + 图例 */
   if (summary) {
@@ -2564,7 +2931,7 @@ function hideFragmentTooltip() {
    这样 sparkline 反映的是"系统此刻的实时吞吐率"，无论用户在看哪个 flow、是否在跑 transfer。*/
 function sampleThroughput() {
   const totalBytes = appState.allPackets
-    .filter((e) => e.role === "client" && e.packet_type === "DATA")
+    .filter((e) => e.role === "client" && ["DATA", "APP_DATA", "STREAM"].includes(e.packet_type))
     .reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
   appState.throughputSamples.push({t: Date.now(), bytes: totalBytes});
   if (appState.throughputSamples.length > 30) appState.throughputSamples.shift();
@@ -2653,19 +3020,26 @@ function renderLogs() {
 /* 维护 flow_id 下拉：根据 appState.realPackets 收集所有出现过的 flow_id。
    保留用户已选值（即使新数据里没有）；不存在时回退到 "全部流"。 */
 function syncPacketFilterOptions() {
+  const typeSel = byId("packet-type-filter");
   const flowSel = byId("packet-flow-filter");
   const stateSel = byId("packet-state-filter");
-  if (!flowSel || !stateSel) return;
+  if (!typeSel || !flowSel || !stateSel) return;
   const flows = new Set();
   const states = new Set();
   for (const p of appState.realPackets) {
     if (p.flow_id) flows.add(p.flow_id);
     if (p.state) states.add(p.state);
   }
+  const currentType = appState.packetFilters.type;
   const sortedFlows = Array.from(flows).sort();
   const sortedStates = Array.from(states).sort();
   const curFlow = appState.packetFilters.flow;
   const curState = appState.packetFilters.state;
+  const packetTypes = protocolPacketTypes();
+  typeSel.innerHTML = `<option value="">${escapeHtml(t("allPacketTypes"))}</option>` +
+    packetTypes.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join("");
+  typeSel.value = (currentType && packetTypes.some((item) => item.name === currentType)) ? currentType : "";
+  appState.packetFilters.type = typeSel.value;
   flowSel.innerHTML = `<option value="">${escapeHtml(t("allFlows"))}</option>` +
     sortedFlows.map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");
   flowSel.value = (curFlow && sortedFlows.includes(curFlow)) ? curFlow : "";
@@ -2704,6 +3078,7 @@ function render() {
   const run = deriveRun();
   updateTopbar(run);
   renderDashboard(run);
+  renderProtocolSummaryCard(run);
   renderConfig(run);
   renderInteractiveAttempt(run);
   renderProtocol();
@@ -2789,6 +3164,7 @@ function connectWebSocket() {
       if (data.type === "status") {
         appState.status.server = {...(appState.status.server || {}), ...(data.server || {})};
         appState.status.client = {...(appState.status.client || {}), ...(data.client || {})};
+        appState.status.experiment = {...(appState.status.experiment || {}), ...(data.experiment || {})};
       }
       render();
     } catch (error) {
@@ -2802,6 +3178,24 @@ function connectWebSocket() {
 
 function formObject(form) {
   return Object.fromEntries(new FormData(form).entries());
+}
+
+async function runScenarioById(scenarioId) {
+  if (scenarioId === "auth-failure") {
+    document.querySelector("#simulate-wrong-btn")?.click();
+    return;
+  }
+  if (scenarioId === "timeout") {
+    document.querySelector("#simulate-timeout-btn")?.click();
+    return;
+  }
+  await window.Api.stopServer();
+  await window.Api.stopClient();
+  await refreshStatus();
+  byId("server-form").requestSubmit();
+  setTimeout(() => {
+    byId("client-form").requestSubmit();
+  }, 350);
 }
 
 function wireEvents() {
@@ -2819,6 +3213,8 @@ function wireEvents() {
     event.preventDefault();
     const data = formObject(event.currentTarget);
     data.inputFile = String(data.inputFile || "").trim();
+    data.protocol = appState.selectedProtocol;
+    data.scenario = appState.selectedScenario;
     byId("server-input-path").value = data.inputFile;
     const pathError = validateRelativePath(data.inputFile, "inputPathEmpty", "inputPathRelativeOnly");
     if (pathError) {
@@ -2836,6 +3232,8 @@ function wireEvents() {
     event.preventDefault();
     const data = formObject(event.currentTarget);
     data.outputFile = String(data.outputFile || "").trim();
+    data.protocol = appState.selectedProtocol;
+    data.scenario = appState.selectedScenario;
     byId("client-output-path").value = data.outputFile;
     const pathError = validateRelativePath(data.outputFile, "outputPathEmpty", "outputPathRelativeOnly");
     if (pathError) {
@@ -2860,6 +3258,25 @@ function wireEvents() {
 
   byId("sidebar-toggle").addEventListener("click", () => {
     setSidebarCollapsed(!appState.sidebarCollapsed);
+  });
+
+  byId("protocol-select")?.addEventListener("change", (event) => {
+    appState.selectedProtocol = event.currentTarget.value || "udp-basic";
+    const protocol = currentProtocolDef();
+    const scenarios = appState.scenarioCatalog[appState.selectedProtocol]?.scenarios || [];
+    appState.selectedScenario = protocol?.defaultScenario || scenarios[0]?.id || "normal";
+    syncProtocolSelectors();
+    render();
+  });
+
+  byId("scenario-select")?.addEventListener("change", (event) => {
+    appState.selectedScenario = event.currentTarget.value || "normal";
+    syncProtocolSelectors();
+    render();
+  });
+
+  byId("run-scenario-btn")?.addEventListener("click", async () => {
+    await runScenarioById(appState.selectedScenario);
   });
 
   byId("theme-select").addEventListener("change", (event) => {
@@ -3219,6 +3636,8 @@ function wireEvents() {
   });
 
   byId("simulate-wrong-btn").addEventListener("click", async () => {
+    appState.selectedScenario = "auth-failure";
+    syncProtocolSelectors();
     const serverForm = formObject(byId("server-form"));
     const clientForm = formObject(byId("client-form"));
     setNotice("");
@@ -3232,7 +3651,11 @@ function wireEvents() {
     const startedAt = Date.now();
     const fallbackIndex = null;
     resetInteractiveAttemptState();
-    const serverResult = await window.Api.startServer(serverForm);
+    const serverResult = await window.Api.startServer({
+      ...serverForm,
+      protocol: appState.selectedProtocol,
+      scenario: appState.selectedScenario,
+    });
     if (serverResult.ok === false) {
       setTestRows([{id: "auth_failed", pass: false}], "auth_failed");
       setNotice(localizeError(serverResult.error || t("serverStartFailed")));
@@ -3243,6 +3666,8 @@ function wireEvents() {
       host: clientForm.host,
       port: serverForm.port,
       outputFile: "output/wrong-auth.bin",
+      protocol: appState.selectedProtocol,
+      scenario: appState.selectedScenario,
       mode: "compat",
       pwd1: "wrong-one",
       pwd2: "wrong-two",
@@ -3267,6 +3692,8 @@ function wireEvents() {
   });
 
   byId("simulate-timeout-btn").addEventListener("click", async () => {
+    appState.selectedScenario = "timeout";
+    syncProtocolSelectors();
     const clientForm = formObject(byId("client-form"));
     setNotice("");
     setTestRows([{id: "timeout", pass: null}], "timeout");
@@ -3283,6 +3710,8 @@ function wireEvents() {
       host: clientForm.host,
       port: timeoutSimulationPort(clientForm.port),
       outputFile: "output/timeout.bin",
+      protocol: appState.selectedProtocol,
+      scenario: appState.selectedScenario,
       mode: "compat",
       pwd1: "secret",
       pwd2: "secret",
@@ -3346,7 +3775,9 @@ async function boot() {
   }
   setTheme(savedTheme || (window.ThemeManager ? window.ThemeManager.defaultTheme : "neumorph"));
   applyLanguage();
+  await loadProtocolCatalog();
   wireEvents();
+  syncProtocolSelectors();
   syncPasswordMode();
   await refreshStatus();
   await refreshLogs();

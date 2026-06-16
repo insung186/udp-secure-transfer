@@ -1,0 +1,25 @@
+{
+  "protocol": "udp-basic",
+  "scenarios": [
+    {
+      "id": "normal",
+      "name": "正常传输",
+      "kind": "standard",
+      "description": "标准 UDP Basic 认证与文件传输流程。"
+    },
+    {
+      "id": "auth-failure",
+      "name": "认证失败",
+      "kind": "simulation",
+      "description": "连续三次密码错误，服务端返回 REJECT。",
+      "action": "simulate-auth-failure"
+    },
+    {
+      "id": "timeout",
+      "name": "超时",
+      "kind": "simulation",
+      "description": "客户端连接未启动服务端，等待超时后中止。",
+      "action": "simulate-timeout"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "websocket-basic",
+  "name": "WebSocket Basic",
+  "version": "2",
+  "transport": "tcp",
+  "summary": "真实 HTTP Upgrade + WebSocket 文本帧、Ping/Pong、Close 教学演示。",
+  "transferView": "message",
+  "sequenceStages": ["UPGRADE_REQUEST", "UPGRADE_RESPONSE", "TEXT", "PING", "PONG", "CLOSE"],
+  "packetTypes": [
+    {"code": 40, "name": "UPGRADE_REQUEST"},
+    {"code": 41, "name": "UPGRADE_RESPONSE"},
+    {"code": 42, "name": "TEXT"},
+    {"code": 43, "name": "PING"},
+    {"code": 44, "name": "PONG"},
+    {"code": 45, "name": "CLOSE"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "frame_type",
+    "status_code", "payload_length", "bytes", "packet_uid", "wire_hex"
+  ]
+}

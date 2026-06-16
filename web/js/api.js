@@ -23,6 +23,8 @@
   }
 
   window.Api = {
+    catalog: () => request("/protocols/catalog.json"),
+    protocolResource: (path) => request(path),
     status: () => request("/api/status"),
     logs: () => request("/api/logs"),
     packets: () => request("/api/packets"),

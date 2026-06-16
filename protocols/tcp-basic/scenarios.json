@@ -1,0 +1,9 @@
+{
+  "protocol": "tcp-basic",
+  "scenarios": [
+    {"id": "normal", "name": "正常传输", "description": "标准 TCP 鉴权后传输文件并校验摘要。"},
+    {"id": "auth-failure", "name": "认证失败", "description": "客户端三次密码都错误，连接被拒绝。"},
+    {"id": "stream-fragmentation", "name": "半包/粘包", "description": "服务端故意把首个 frame 拆开发送，演示 TCP 字节流重组。"},
+    {"id": "connection-close-mid-transfer", "name": "中途断连", "description": "发送首个 DATA 后主动关闭连接，观察传输中止。"}
+  ]
+}

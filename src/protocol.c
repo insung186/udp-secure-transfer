@@ -47,13 +47,17 @@ const char *packet_type_name(uint16_t type) {
         return "TERMINATE";
     case PKT_REJECT:
         return "REJECT";
+    case PKT_ACK:
+        return "ACK";
+    case PKT_NACK:
+        return "NACK";
     default:
         return "UNKNOWN";
     }
 }
 
 int packet_type_valid(uint16_t type) {
-    return type >= PKT_JOIN_REQ && type <= PKT_REJECT;
+    return type >= PKT_JOIN_REQ && type <= PKT_NACK;
 }
 
 int is_same_peer(const struct sockaddr_in *a, const struct sockaddr_in *b) {
@@ -128,6 +132,20 @@ int build_data_packet(uint32_t packet_id, const uint8_t *data, uint32_t data_len
         memcpy(out + PROTOCOL_DATA_HEADER_SIZE, data, data_len);
     }
     *out_len = PROTOCOL_DATA_HEADER_SIZE + data_len;
+    return 0;
+}
+
+int build_feedback_packet(uint16_t type, uint32_t ack_id, uint32_t window_size,
+                          uint8_t *out, size_t cap, size_t *out_len) {
+    if (!out || !out_len || (type != PKT_ACK && type != PKT_NACK) ||
+        cap < PROTOCOL_FEEDBACK_HEADER_SIZE) {
+        return -1;
+    }
+    put_u16(out, type);
+    put_u32(out + 2, PROTOCOL_FEEDBACK_PAYLOAD_SIZE);
+    put_u32(out + PROTOCOL_HEADER_SIZE, ack_id);
+    put_u32(out + PROTOCOL_HEADER_SIZE + 4, window_size);
+    *out_len = PROTOCOL_FEEDBACK_HEADER_SIZE;
     return 0;
 }
 
@@ -215,6 +233,16 @@ int parse_packet(const uint8_t *buf, size_t len, Packet *packet,
         }
         packet->payload = packet->wire + PROTOCOL_HEADER_SIZE;
         return 0;
+    case PKT_ACK:
+    case PKT_NACK:
+        if (payload_len != PROTOCOL_FEEDBACK_PAYLOAD_SIZE ||
+            len != PROTOCOL_FEEDBACK_HEADER_SIZE) {
+            return parse_fail(error, error_size, "feedback packet length mismatch");
+        }
+        packet->ack_id = get_u32(buf + PROTOCOL_HEADER_SIZE);
+        packet->window_size = get_u32(buf + PROTOCOL_HEADER_SIZE + 4);
+        packet->payload = NULL;
+        return 0;
     default:
         return parse_fail(error, error_size, "invalid packet");
     }
@@ -284,6 +312,41 @@ int env_timeout_ms(void) {
     value = strtol(text, &end, 10);
     if (errno != 0 || !end || *end != '\0' || value < 200 || value > 120000) {
         return 10000;
+    }
+    return (int)value;
+}
+
+int protocol_is_reliable(void) {
+    const char *name = getenv("UDP_SECURE_PROTOCOL");
+    return name && strcmp(name, "udp-reliable") == 0;
+}
+
+int env_reliable_window_size(void) {
+    const char *text = getenv("UDP_SECURE_WINDOW_SIZE");
+    char *end = NULL;
+    long value;
+    if (!text || !*text) {
+        return 4;
+    }
+    errno = 0;
+    value = strtol(text, &end, 10);
+    if (errno != 0 || !end || *end != '\0' || value < 2 || value > 64) {
+        return 4;
+    }
+    return (int)value;
+}
+
+int env_reliable_timeout_ms(void) {
+    const char *text = getenv("UDP_SECURE_RELIABLE_TIMEOUT_MS");
+    char *end = NULL;
+    long value;
+    if (!text || !*text) {
+        return 400;
+    }
+    errno = 0;
+    value = strtol(text, &end, 10);
+    if (errno != 0 || !end || *end != '\0' || value < 50 || value > 10000) {
+        return 400;
     }
     return (int)value;
 }

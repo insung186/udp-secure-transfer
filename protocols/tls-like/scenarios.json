@@ -1,0 +1,10 @@
+{
+  "protocol": "tls-like",
+  "scenarios": [
+    {"id": "normal", "name": "正常握手", "description": "完成 CLIENT_HELLO / SERVER_HELLO / FINISHED，然后发送 APP_DATA。"},
+    {"id": "bad-password", "name": "错误密码", "description": "认证阶段就失败，不进入 tls-like 握手。"},
+    {"id": "tampered-finished", "name": "篡改 Finished", "description": "服务端故意发送错误的 FINISHED，客户端在握手阶段终止。"},
+    {"id": "tampered-app-data", "name": "篡改 APP_DATA", "description": "APP_DATA 的 MAC 被破坏，客户端检测失败。"},
+    {"id": "replay", "name": "重放", "description": "重复发送同一条 APP_DATA，客户端记录 replay 风险并中止。"}
+  ]
+}

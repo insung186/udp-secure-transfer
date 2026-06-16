@@ -1,0 +1,56 @@
+{
+  "id": "udp-basic",
+  "name": "UDP Basic",
+  "version": "2",
+  "transport": "udp",
+  "sequenceStages": [
+    "JOIN_REQ",
+    "PASS_REQ",
+    "PASS_RESP",
+    "PASS_ACCEPT",
+    "DATA",
+    "TERMINATE"
+  ],
+  "states": [
+    "INIT",
+    "WAIT_JOIN_REQ",
+    "AUTH",
+    "DATA_TRANSFER",
+    "VERIFY",
+    "DONE",
+    "ABORT"
+  ],
+  "packetTypes": [
+    {"code": 1, "name": "JOIN_REQ"},
+    {"code": 2, "name": "PASS_REQ"},
+    {"code": 3, "name": "PASS_RESP"},
+    {"code": 4, "name": "PASS_ACCEPT"},
+    {"code": 5, "name": "DATA"},
+    {"code": 6, "name": "TERMINATE"},
+    {"code": 7, "name": "REJECT"}
+  ],
+  "logFields": [
+    "schema_version",
+    "protocol",
+    "transport",
+    "role",
+    "flow_id",
+    "session_id",
+    "scenario",
+    "time",
+    "level",
+    "event",
+    "peer",
+    "state",
+    "packet_type",
+    "packet_code",
+    "packet_id",
+    "payload_length",
+    "bytes",
+    "sha1",
+    "direction",
+    "packet_uid",
+    "wire_hex",
+    "message"
+  ]
+}

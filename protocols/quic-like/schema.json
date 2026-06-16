@@ -1,0 +1,24 @@
+{
+  "id": "quic-like",
+  "name": "QUIC-like",
+  "version": "2",
+  "transport": "udp",
+  "summary": "教学版 QUIC-like：连接 ID、多 stream、ACK 与重传、0-RTT 风险演示。",
+  "transferView": "file",
+  "sequenceStages": ["INITIAL", "HANDSHAKE", "HANDSHAKE_ACK", "STREAM", "ACK", "CLOSE"],
+  "packetTypes": [
+    {"code": 60, "name": "INITIAL"},
+    {"code": 61, "name": "HANDSHAKE"},
+    {"code": 62, "name": "HANDSHAKE_ACK"},
+    {"code": 63, "name": "STREAM"},
+    {"code": 64, "name": "ACK"},
+    {"code": 65, "name": "CLOSE"},
+    {"code": 66, "name": "ZERO_RTT"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "connection_id",
+    "stream_id", "seq", "ack", "retransmit_count", "payload_length",
+    "bytes", "packet_uid", "wire_hex", "security.replay", "security.handshake_phase"
+  ]
+}

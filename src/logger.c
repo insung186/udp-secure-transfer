@@ -11,6 +11,15 @@
 #include <time.h>
 #include <unistd.h>
 
+static void logger_copy_default(char *dst, size_t dst_size,
+                                const char *env_name, const char *fallback) {
+    const char *value = getenv(env_name);
+    if (!value || !value[0]) {
+        value = fallback ? fallback : "";
+    }
+    snprintf(dst, dst_size, "%s", value);
+}
+
 void ensure_runtime_dirs(void) {
     mkdir("logs", 0755);
     mkdir("output", 0755);
@@ -26,6 +35,22 @@ int logger_open(Logger *logger, const char *role, const char *path) {
     memset(logger, 0, sizeof(*logger));
     snprintf(logger->role, sizeof(logger->role), "%s", role);
     snprintf(logger->path, sizeof(logger->path), "%s", path);
+    logger_copy_default(logger->schema_version, sizeof(logger->schema_version),
+                        "UDP_SECURE_SCHEMA_VERSION", "2");
+    if (strcmp(role, "control") == 0) {
+        logger_copy_default(logger->protocol, sizeof(logger->protocol),
+                            "UDP_SECURE_PROTOCOL", "control-plane");
+        logger_copy_default(logger->transport, sizeof(logger->transport),
+                            "UDP_SECURE_TRANSPORT", "http-ws");
+    } else {
+        logger_copy_default(logger->protocol, sizeof(logger->protocol),
+                            "UDP_SECURE_PROTOCOL", "udp-basic");
+        logger_copy_default(logger->transport, sizeof(logger->transport),
+                            "UDP_SECURE_TRANSPORT", "udp");
+    }
+    logger_copy_default(logger->flow_id, sizeof(logger->flow_id), "UDP_SECURE_FLOW_ID", "");
+    logger_copy_default(logger->session_id, sizeof(logger->session_id), "UDP_SECURE_SESSION_ID", "");
+    logger_copy_default(logger->scenario, sizeof(logger->scenario), "UDP_SECURE_SCENARIO", "");
     logger->fp = fopen(path, "a");
     if (!logger->fp) {
         return -1;
@@ -128,6 +153,18 @@ static void write_pid_field(FILE *fp, int *first, const char *key, pid_t value) 
     fprintf(fp, ":%ld", (long)value);
 }
 
+static void write_bool_field(FILE *fp, int *first, const char *key, int value) {
+    if (value == LOG_INT_UNSET) {
+        return;
+    }
+    if (!*first) {
+        fputc(',', fp);
+    }
+    *first = 0;
+    json_escape(fp, key);
+    fprintf(fp, ":%s", value ? "true" : "false");
+}
+
 /* 计算 packet_uid：同一 wire 包在 client/server 两端必须产生相同值。
    派生规则：
    - PASS_RESP 哈希完整 wire（header + 整个密码载荷）。原因：前 8 字节对 PASS_RESP
@@ -184,6 +221,16 @@ void logger_write(Logger *logger, const LogEvent *event) {
     if (!event) {
         memset(&empty, 0, sizeof(empty));
         empty.packet_id = LOG_INT_UNSET;
+        empty.seq = LOG_INT_UNSET;
+        empty.ack = LOG_INT_UNSET;
+        empty.window_size = LOG_INT_UNSET;
+        empty.retransmit_count = LOG_INT_UNSET;
+        empty.stream_id = LOG_INT_UNSET;
+        empty.stream_offset = LOG_INT_UNSET;
+        empty.status_code = LOG_INT_UNSET;
+        empty.security_encrypted = LOG_INT_UNSET;
+        empty.security_mac_valid = LOG_INT_UNSET;
+        empty.security_replay = LOG_INT_UNSET;
         empty.payload_length = LOG_INT_UNSET;
         empty.bytes = LOG_INT_UNSET;
         empty.attempt = LOG_INT_UNSET;
@@ -194,7 +241,20 @@ void logger_write(Logger *logger, const LogEvent *event) {
     timestamp_now(time_buf, sizeof(time_buf));
     fputc('{', logger->fp);
     write_string_field(logger->fp, &first, "time", time_buf);
+    write_string_field(logger->fp, &first, "schema_version",
+                       event->schema_version ? event->schema_version : logger->schema_version);
+    write_string_field(logger->fp, &first, "protocol",
+                       event->protocol ? event->protocol : logger->protocol);
+    write_string_field(logger->fp, &first, "transport",
+                       event->transport ? event->transport : logger->transport);
     write_string_field(logger->fp, &first, "role", logger->role);
+    write_string_field(logger->fp, &first, "flow_id",
+                       event->flow_id ? event->flow_id : logger->flow_id);
+    write_string_field(logger->fp, &first, "session_id",
+                       event->session_id ? event->session_id : logger->session_id);
+    write_string_field(logger->fp, &first, "scenario",
+                       event->scenario ? event->scenario : logger->scenario);
+    write_string_field(logger->fp, &first, "connection_id", event->connection_id);
     write_string_field(logger->fp, &first, "level", event->level ? event->level : "INFO");
     write_string_field(logger->fp, &first, "event", event->event ? event->event : "EVENT");
     write_string_field(logger->fp, &first, "peer", event->peer ? event->peer : "");
@@ -207,12 +267,44 @@ void logger_write(Logger *logger, const LogEvent *event) {
     write_string_field(logger->fp, &first, "message", event->message);
     write_string_field(logger->fp, &first, "direction", event->direction);
     write_string_field(logger->fp, &first, "packet_uid", event->packet_uid);
+    write_string_field(logger->fp, &first, "method", event->method);
+    write_string_field(logger->fp, &first, "path", event->path);
+    write_string_field(logger->fp, &first, "header_summary", event->header_summary);
+    write_string_field(logger->fp, &first, "frame_type", event->frame_type);
+    write_string_field(logger->fp, &first, "handshake_phase", event->handshake_phase);
     write_int_field(logger->fp, &first, "packet_code", event->packet_code);
+    write_int_field(logger->fp, &first, "seq", event->seq);
+    write_int_field(logger->fp, &first, "ack", event->ack);
+    write_int_field(logger->fp, &first, "window_size", event->window_size);
+    write_int_field(logger->fp, &first, "retransmit_count", event->retransmit_count);
+    write_int_field(logger->fp, &first, "stream_id", event->stream_id);
+    write_int_field(logger->fp, &first, "stream_offset", event->stream_offset);
+    write_int_field(logger->fp, &first, "status_code", event->status_code);
     write_int_field(logger->fp, &first, "packet_id", event->packet_id);
     write_int_field(logger->fp, &first, "payload_length", event->payload_length);
     write_int_field(logger->fp, &first, "bytes", event->bytes);
     write_int_field(logger->fp, &first, "attempt", event->attempt);
     write_int_field(logger->fp, &first, "port", event->port);
+    if (event->security_encrypted != LOG_INT_UNSET ||
+        event->security_mac_valid != LOG_INT_UNSET ||
+        event->security_replay != LOG_INT_UNSET ||
+        event->handshake_phase) {
+        if (!first) {
+            fputc(',', logger->fp);
+        }
+        first = 0;
+        json_escape(logger->fp, "security");
+        fputc(':', logger->fp);
+        fputc('{', logger->fp);
+        {
+            int security_first = 1;
+            write_bool_field(logger->fp, &security_first, "encrypted", event->security_encrypted);
+            write_bool_field(logger->fp, &security_first, "mac_valid", event->security_mac_valid);
+            write_bool_field(logger->fp, &security_first, "replay", event->security_replay);
+            write_string_field(logger->fp, &security_first, "handshake_phase", event->handshake_phase);
+        }
+        fputc('}', logger->fp);
+    }
     write_pid_field(logger->fp, &first, "pid", event->pid);
     fputs("}\n", logger->fp);
     fflush(logger->fp);

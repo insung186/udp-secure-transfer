@@ -1,0 +1,9 @@
+{
+  "protocol": "quic-like",
+  "scenarios": [
+    {"id": "normal", "name": "正常连接", "description": "完成简化握手后在单 stream 上发送内容。"},
+    {"id": "stream-reorder", "name": "多 stream 乱序", "description": "先发送 stream 3，再发送 stream 1，展示多 stream 不阻塞。"},
+    {"id": "loss-recovery", "name": "丢包恢复", "description": "服务端以 retransmit_count 标记恢复发送，演示 ACK / 重传概念。"},
+    {"id": "zero-rtt-replay-risk", "name": "0-RTT 风险", "description": "握手前先发送 0-RTT 数据，并在日志中标出 replay 风险。"}
+  ]
+}

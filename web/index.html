@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>UDP 安全传输实验台</title>
+    <title>多协议教学演示平台</title>
     <link rel="stylesheet" href="/css/themes.css">
     <link rel="stylesheet" href="/css/style.css">
   </head>
@@ -42,6 +42,30 @@
 
         <div class="sidebar-content">
           <section class="control-section state-panel" id="config-state"></section>
+
+          <section class="control-section sidebar-form">
+            <div class="panel-head">
+              <h2 data-i18n="protocolLab">协议与场景</h2>
+              <span class="hint" data-i18n="platformHint">平台化配置</span>
+            </div>
+            <div class="appearance-row">
+              <label class="appearance-cell">
+                <span class="label-text" data-i18n="protocolSelect">协议</span>
+                <select id="protocol-select"></select>
+              </label>
+              <label class="appearance-cell">
+                <span class="label-text" data-i18n="scenarioSelect">场景</span>
+                <select id="scenario-select"></select>
+              </label>
+            </div>
+            <p class="hint" id="scenario-description" data-i18n="scenarioDescription">当前场景说明会显示在这里。</p>
+            <div class="button-row">
+              <button class="ghost-button" id="run-scenario-btn" type="button">
+                <span class="shape-icon icon-play" aria-hidden="true"></span>
+                <span data-i18n="runScenario">运行场景</span>
+              </button>
+            </div>
+          </section>
 
           <form class="control-section sidebar-form" id="server-form">
             <div class="panel-head">
@@ -257,6 +281,7 @@
               <div class="phase-rail" id="dashboard-phases"></div>
             </section>
             <div class="dashboard-side">
+              <section class="panel protocol-summary-panel" id="protocol-summary-panel"></section>
               <section class="panel metrics-panel" id="metrics-panel"></section>
               <section class="panel digest-panel" id="digest-panel"></section>
             </div>
