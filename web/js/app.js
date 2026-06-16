@@ -55,6 +55,19 @@ const appState = {
     packets: 1,
     logs: 1,
   },
+  /* throughputSamples: 每秒采一次，{t, bytes}。
+     sparkline 用 samples 推算每秒速率；30 个点保留约 30 秒历史。 */
+  throughputSamples: [],
+  /* transferFlowId: 传输 tab 的 flow 选择器；独立于 currentFlowId，让用户
+     在不影响主视图的情况下翻看历史 flow。null 表示跟随 currentFlowId。 */
+  transferFlowId: null,
+  /* matrixView: 分片矩阵显示选项 */
+  matrixView: {
+    showDup: true,
+    showGaps: true,
+    showTime: false,
+  },
+  hoverFragmentId: null,
 };
 
 const PAGE_SIZE = 10;
@@ -157,6 +170,59 @@ const i18n = {
     transferProgress: "传输进度",
     fragmentMatrix: "分片矩阵",
     fragmentHint: "每格代表一个 DATA packet_id",
+    transferContext: "当前传输",
+    flowSelector: "Flow",
+    transferHeroIdle: "等待启动服务端和客户端",
+    transferHeroNoFlow: "尚未产生传输 flow",
+    transferHeroFiles: "{server} → {client}",
+    transferHeroMeta: "开始 {start} · 持续 {duration} · 期望 {total}",
+    transferHeroPhaseOk: "摘要匹配 ✓",
+    transferHeroPhaseFail: "摘要不匹配 ✗",
+    transferHeroPhaseRunning: "传输中…",
+    transferHeroPhaseAuth: "认证中…",
+    transferHeroPhaseIdle: "空闲",
+    transferHeroScenario: "场景: {scenario}",
+    lifecycleTitle: "传输阶段",
+    stageIdle: "空闲",
+    stageAuth: "认证",
+    stageTransfer: "传输",
+    stageVerify: "校验",
+    stageDone: "完成",
+    stageAbort: "中止",
+    transferThroughput: "吞吐率时间线",
+    throughputNow: "当前",
+    throughputAvg: "平均",
+    throughputPeak: "峰值",
+    throughputWindow: "近 {seconds}s 窗口",
+    throughputIdle: "等待数据流…",
+    matrixSummary: "已收 {received} / 期望 {expected} · 丢失 {lost} · 重复 {dup} · 乱序 {oof}",
+    matrixShowDup: "显示重复",
+    matrixShowGaps: "标出缺口",
+    matrixShowTime: "显示时间带",
+    legendReceived: "已收",
+    legendLost: "丢失",
+    legendDup: "重复",
+    legendOof: "乱序",
+    legendPending: "未到",
+    matrixIdle: "传输尚未开始。启动客户端后这里会显示 DATA 分片矩阵。",
+    matrixAuthOnly: "认证阶段，尚未传输 DATA。",
+    fragmentTooltip: "DATA #{id} · {bytes} · {time} · 距 {prev} {delta}",
+    fragmentTooltipFirst: "DATA #{id} · {bytes} · {time}",
+    etaSuffix: "剩余约 {seconds}",
+    etaLabel: "ETA",
+    etaDone: "传输完成",
+    etaPending: "等待数据开始",
+    integrityCheck: "完整性校验",
+    transferHistory: "传输历史",
+    historyEmpty: "暂无传输历史",
+    historyCount: "{count} 次传输",
+    historyResultOk: "成功",
+    historyResultAbort: "中止",
+    historyResultPending: "进行中",
+    historyDurationMs: "{ms} ms",
+    historyDurationS: "{s} s",
+    noResultYet: "—",
+    latestFlow: "跟随最新",
     logFilters: "日志过滤",
     logFormatHint: "JSON 行日志",
     allRoles: "角色",
@@ -383,6 +449,59 @@ const i18n = {
     transferProgress: "Transfer progress",
     fragmentMatrix: "Fragment matrix",
     fragmentHint: "Each cell represents one DATA packet_id",
+    transferContext: "Current Transfer",
+    flowSelector: "Flow",
+    transferHeroIdle: "Start the server and client to begin a transfer.",
+    transferHeroNoFlow: "No transfer flow yet",
+    transferHeroFiles: "{server} → {client}",
+    transferHeroMeta: "Start {start} · Duration {duration} · Expected {total}",
+    transferHeroPhaseOk: "Digest match ✓",
+    transferHeroPhaseFail: "Digest mismatch ✗",
+    transferHeroPhaseRunning: "Transferring…",
+    transferHeroPhaseAuth: "Authenticating…",
+    transferHeroPhaseIdle: "Idle",
+    transferHeroScenario: "Scenario: {scenario}",
+    lifecycleTitle: "Transfer phases",
+    stageIdle: "Idle",
+    stageAuth: "Auth",
+    stageTransfer: "Transfer",
+    stageVerify: "Verify",
+    stageDone: "Done",
+    stageAbort: "Abort",
+    transferThroughput: "Throughput timeline",
+    throughputNow: "now",
+    throughputAvg: "avg",
+    throughputPeak: "peak",
+    throughputWindow: "last {seconds}s window",
+    throughputIdle: "Waiting for data…",
+    matrixSummary: "Received {received} / Expected {expected} · Lost {lost} · Dup {dup} · OoO {oof}",
+    matrixShowDup: "Show duplicates",
+    matrixShowGaps: "Mark gaps",
+    matrixShowTime: "Show time band",
+    legendReceived: "received",
+    legendLost: "lost",
+    legendDup: "dup",
+    legendOof: "OoO",
+    legendPending: "pending",
+    matrixIdle: "Transfer not started. Cells will appear once the client sends DATA.",
+    matrixAuthOnly: "Authentication phase, no DATA yet.",
+    fragmentTooltip: "DATA #{id} · {bytes} · {time} · Δ {delta} from {prev}",
+    fragmentTooltipFirst: "DATA #{id} · {bytes} · {time}",
+    etaSuffix: "~{seconds} left",
+    etaLabel: "ETA",
+    etaDone: "Transfer complete",
+    etaPending: "Waiting for data",
+    integrityCheck: "Integrity check",
+    transferHistory: "Transfer history",
+    historyEmpty: "No transfer history",
+    historyCount: "{count} runs",
+    historyResultOk: "OK",
+    historyResultAbort: "Abort",
+    historyResultPending: "Running",
+    historyDurationMs: "{ms} ms",
+    historyDurationS: "{s} s",
+    noResultYet: "—",
+    latestFlow: "Follow latest",
     logFilters: "Log filters",
     logFormatHint: "JSON Lines",
     allRoles: "All roles",
@@ -551,6 +670,12 @@ function formatBytes(bytes) {
   return `${(value / 1024 / 1024).toFixed(2)} MB`;
 }
 
+/* HH:MM:SS — 给 sparkline 的"now 标记"用 */
+function formatTimeOfDay(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -597,6 +722,17 @@ function resetFrontendRunState({clearFilters = false} = {}) {
   appState.pagination.packets = 1;
   appState.pagination.logs = 1;
   appState.notice = "";
+  appState.throughputSamples = [];
+  appState.transferFlowId = null;
+  appState.hoverFragmentId = null;
+  appState.matrixView = {showDup: true, showGaps: true, showTime: false};
+  // 同步 DOM 上的 checkbox 状态（防止重置后开关与 state 不一致）
+  const dup = byId("matrix-show-dup");
+  const gaps = byId("matrix-show-gaps");
+  const time = byId("matrix-show-time");
+  if (dup) dup.checked = true;
+  if (gaps) gaps.checked = true;
+  if (time) time.checked = false;
   resetInteractiveAttemptState();
   if (clearFilters) {
     // 包过滤
@@ -1003,6 +1139,152 @@ function deriveRun() {
     finalEvent,
     flowId,
   };
+}
+
+/**
+ * 解析传输矩阵状态：基于一个 flow 的所有 DATA 日志计算每个 packet_id 的最终态。
+ * 语义：
+ *   - expectedCount = max(server SEND DATA packet_id) + 1（server 序号从 0 开始）
+ *   - receivedSet  = client RECV DATA 的 packet_id 集合
+ *   - lostIds      = expected 但未到达（server 发了但 client 没收到）
+ *   - dupIds       = 同一 packet_id 收到多次（用 packet_uid 计数）
+ *   - oofIds       = 到达时间晚于其后编号（视为乱序）
+ *   - pendingIds   = 在 [0, expected) 中、server 还没发的（多用于传输中）
+ * 入参是 deriveRun() 返回值（含 dataRecv / dataSent）。
+ */
+function computeTransferStats(run) {
+  const sentIds = new Set();
+  let maxSentId = -1;
+  for (const e of (run.dataSent || [])) {
+    const id = Number(e.packet_id || 0);
+    sentIds.add(id);
+    if (id > maxSentId) maxSentId = id;
+  }
+
+  const recvIds = new Set();
+  const recvCount = new Map();
+  let maxRecvId = -1;
+  for (const e of (run.dataRecv || [])) {
+    const id = Number(e.packet_id || 0);
+    recvIds.add(id);
+    recvCount.set(id, (recvCount.get(id) || 0) + 1);
+    if (id > maxRecvId) maxRecvId = id;
+  }
+
+  const expectedCount = sentIds.size > 0 ? Math.max(maxSentId + 1, 0) : 0;
+
+  const lostIds = new Set();
+  if (expectedCount > 0) {
+    for (let id = 0; id < expectedCount; id += 1) {
+      if (sentIds.has(id) && !recvIds.has(id)) lostIds.add(id);
+    }
+  }
+
+  const dupIds = new Set();
+  let dupCount = 0;
+  for (const [id, count] of recvCount) {
+    if (count > 1) {
+      dupIds.add(id);
+      dupCount += count - 1;
+    }
+  }
+
+  /* 乱序判定：按到达时间遍历，如果当前 packet_id 小于已见最大值，
+     视为该包"迟到"——计为一次乱序。O(n) 一次扫描。 */
+  const oofIds = new Set();
+  const sortedRecv = [...(run.dataRecv || [])].sort(
+    (a, b) => logTimeMs(a) - logTimeMs(b)
+  );
+  let oofCount = 0;
+  let maxSoFar = -1;
+  for (const e of sortedRecv) {
+    const id = Number(e.packet_id || 0);
+    if (id < maxSoFar) {
+      oofCount += 1;
+      oofIds.add(id);
+    } else {
+      maxSoFar = id;
+    }
+  }
+
+  /* pending：server 还没发的（expectedCount 内、sentIds 没有的）。 */
+  const pendingIds = new Set();
+  if (expectedCount > 0) {
+    for (let id = 0; id < expectedCount; id += 1) {
+      if (!sentIds.has(id)) pendingIds.add(id);
+    }
+  }
+
+  return {
+    expectedCount,
+    receivedCount: recvIds.size,
+    sentCount: sentIds.size,
+    lostCount: lostIds.size,
+    dupCount,
+    oofCount,
+    lostIds,
+    dupIds,
+    oofIds,
+    pendingIds,
+    recvIds,
+    sentIds,
+  };
+}
+
+/**
+ * 传输 tab 实际使用的 flow id：
+ * 1) 用户在 transfer-flow-select 里显式选了某个 flow → 用它
+ * 2) 否则跟随 currentFlowId
+ * 3) 都没有 → null
+ */
+function effectiveTransferFlowId() {
+  if (appState.transferFlowId) return appState.transferFlowId;
+  return appState.currentFlowId;
+}
+
+/**
+ * 收集历史 flow：按 flow_id 汇总每条 flow 的 result / phase / 时长 / 字节。
+ * 给传输历史面板用。最多返回 10 条最近的。
+ */
+function collectFlowHistory() {
+  const flows = new Map();
+  for (const entry of appState.logs) {
+    if (!entry.flow_id) continue;
+    if (!flows.has(entry.flow_id)) {
+      flows.set(entry.flow_id, {
+        flowId: entry.flow_id,
+        firstTime: entry.time,
+        lastTime: entry.time,
+        role: entry.role,
+        events: [],
+        packetsSent: 0,
+        packetsRecv: 0,
+        bytes: 0,
+        result: null,
+        scenario: null,
+      });
+    }
+    const f = flows.get(entry.flow_id);
+    if (entry.time && entry.time < f.firstTime) f.firstTime = entry.time;
+    if (entry.time && entry.time > f.lastTime) f.lastTime = entry.time;
+    if (entry.event) f.events.push(entry.event);
+    if (entry.packet_type === "DATA" && entry.role === "server") {
+      f.packetsSent += 1;
+      f.bytes = Math.max(f.bytes, Number(entry.payload_length || entry.bytes || 0));
+    }
+    if (entry.packet_type === "DATA" && entry.role === "client") {
+      f.packetsRecv += 1;
+    }
+    if (entry.event === "FINAL_OK") f.result = "OK";
+    else if (entry.event === "FINAL_ABORT") f.result = "ABORT";
+    else if (entry.event === "AUTH_FAIL") f.result = f.result || "AUTH_FAIL";
+    else if (entry.event === "TIMEOUT") f.result = f.result || "TIMEOUT";
+    if (entry.event === "AUTH_SUCCESS") f.scenario = "OK";
+  }
+  const arr = Array.from(flows.values()).sort(
+    (a, b) => String(b.firstTime).localeCompare(String(a.firstTime))
+  );
+  return arr.slice(0, 10);
 }
 
 function packetDirection(entry) {
@@ -1798,24 +2080,494 @@ function parsePacketFields(packet) {
   return fields;
 }
 
+/* 传输 tab 总入口：依次渲染子面板。
+   注意：这里的 run 仍然是 deriveRun() 结果（基于 currentFlowId），
+   但所有"显示用的 run"都基于 effectiveTransferFlowId()，让用户能切换历史。 */
 function renderTransfer(run) {
-  byId("transfer-progress").style.width = `${run.progress}%`;
-  byId("throughput-label").textContent = `${formatBytes(Math.round(run.throughput))}/s`;
-  byId("transfer-stats").innerHTML = `
-    <div class="metric"><span>${t("progress")}</span><strong>${run.progress}%</strong></div>
-    <div class="metric"><span>${t("received")}</span><strong>${formatBytes(run.receivedBytes)}</strong></div>
-    <div class="metric"><span>${t("sent")}</span><strong>${formatBytes(run.sentBytes)}</strong></div>
-    <div class="metric"><span>${t("packets")}</span><strong>${run.dataRecv.length}</strong></div>
-  `;
-  const ids = run.dataRecv.map((entry) => Number(entry.packet_id || 0));
-  const maxId = ids.length ? Math.max(...ids) : 0;
-  const cells = Math.max(maxId + 1, run.result === "Pending" ? 24 : ids.length);
-  const received = new Set(ids);
-  byId("fragment-matrix").innerHTML = Array.from({length: Math.min(Math.max(cells, 1), 400)}, (_, id) => {
-    const cls = received.has(id) ? "received" : "";
-    return `<button class="fragment ${cls}" title="DATA #${id}" data-fragment-id="${id}" type="button"></button>`;
+  const flowId = effectiveTransferFlowId();
+  const scopedRun = scopeRunToFlow(run, flowId);
+  const stats = computeTransferStats(scopedRun);
+
+  renderTransferFlowOptions();
+  renderTransferHero(scopedRun, flowId);
+  renderLifecycle(scopedRun);
+  renderProgress(scopedRun, stats);
+  renderThroughput(scopedRun);
+  renderFragmentMatrix(scopedRun, stats);
+  renderIntegrity(scopedRun);
+  renderTransferHistory();
+}
+
+/**
+ * 复制一份 deriveRun 输出，但把 dataRecv/dataSent/sentBytes 等都按指定 flowId 过滤。
+   如果当前 run 已经是该 flow 直接复用；否则按 flow 重新聚合。
+   注意：必须用 allPackets（未去重），不能用 realPackets（按 packet_uid 跨端去重后，
+   canonical 几乎总是 server 端的 SEND_DATA，导致 dataRecv 永远是空，
+   进而 progress = 0、lostCount = expectedCount）。*/
+function scopeRunToFlow(run, flowId) {
+  if (!flowId || run.flowId === flowId) return run;
+  const flowLogs = appState.logs.filter((e) => e.flow_id === flowId);
+  /* 关键：用 allPackets，保留 client / server 两端记录。*/
+  const flowPackets = appState.allPackets.filter((e) => e.flow_id === flowId);
+  const dataRecv = flowPackets.filter((e) => e.role === "client" && e.packet_type === "DATA");
+  const dataSent = flowPackets.filter((e) => e.role === "server" && e.packet_type === "DATA");
+  const receivedBytes = dataRecv.reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
+  const sentBytes = dataSent.reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
+  const finalEvent = [...flowLogs].reverse().find(
+    (e) => e.event === "FINAL_OK" || e.event === "FINAL_ABORT"
+  );
+  let result = finalEvent
+    ? (finalEvent.result || (finalEvent.event === "FINAL_OK" ? "OK" : "ABORT"))
+    : "Pending";
+  const inputStart = [...flowLogs].reverse().find((e) => e.event === "SERVER_START");
+  const totalBytes = Number(inputStart?.bytes || Math.max(receivedBytes, sentBytes, 0));
+  const progress = totalBytes > 0
+    ? Math.min(100, Math.round((receivedBytes / totalBytes) * 100))
+    : (result === "OK" ? 100 : 0);
+  const firstData = dataRecv[0];
+  const lastData = dataRecv[dataRecv.length - 1];
+  let throughput = 0;
+  if (firstData && lastData) {
+    const start = new Date(firstData.time).getTime();
+    const end = new Date(lastData.time).getTime();
+    throughput = receivedBytes / Math.max(1, end - start) * 1000;
+  }
+  let phase = "INIT";
+  if (result === "ABORT") phase = "ABORT";
+  else if (flowLogs.some((e) => e.event === "DIGEST_MATCH")) phase = "DONE";
+  else if (flowLogs.some((e) => e.packet_type === "TERMINATE")) phase = "VERIFY";
+  else if (dataRecv.length > 0) phase = "DATA_TRANSFER";
+  else if (flowLogs.some((e) => ["PASS_REQ","PASS_RESP","PASS_ACCEPT","REJECT"].includes(e.packet_type))) phase = "AUTH";
+  else if (flowLogs.some((e) => e.packet_type === "JOIN_REQ")) phase = "JOIN";
+  const attempts = Math.max(0, ...flowLogs.map((e) => Number(e.attempt || 0)));
+  const serverDigest = [...flowLogs].reverse().find((e) => e.event === "SERVER_DIGEST" && e.sha1);
+  const clientDigest = [...flowLogs].reverse().find(
+    (e) => (e.event === "DIGEST_MATCH" || e.event === "DIGEST_MISMATCH") && e.sha1
+  );
+  return {
+    ...run,
+    flowId,
+    result,
+    phase,
+    attempts,
+    progress,
+    totalBytes,
+    receivedBytes,
+    sentBytes,
+    dataRecv,
+    dataSent,
+    throughput,
+    serverDigest: serverDigest?.sha1 || "",
+    clientDigest: clientDigest?.sha1 || "",
+    digestMatch: Boolean(clientDigest && clientDigest.event === "DIGEST_MATCH"),
+  };
+}
+
+/* 1. Hero: 上下文 + Flow 选择器 */
+function renderTransferFlowOptions() {
+  const sel = byId("transfer-flow-select");
+  if (!sel) return;
+  const flows = collectFlowHistory();
+  const current = effectiveTransferFlowId() || "";
+  sel.innerHTML = `<option value="" data-i18n="latestFlow">${escapeHtml(t("latestFlow") || "Latest")}</option>` +
+    flows.map((f) =>
+      `<option value="${escapeHtml(f.flowId)}">${escapeHtml(f.flowId)}</option>`
+    ).join("");
+  sel.value = current;
+}
+
+function renderTransferHero(run, flowId) {
+  const titleNode = byId("transfer-hero-title");
+  const filesNode = byId("transfer-hero-files");
+  const metaNode = byId("transfer-hero-meta");
+  if (!titleNode) return;
+
+  if (!flowId) {
+    titleNode.textContent = t("transferHeroIdle");
+    if (filesNode) filesNode.textContent = "";
+    if (metaNode) metaNode.textContent = "";
+    return;
+  }
+
+  /* 标题随结果/阶段变化 */
+  let title = "";
+  if (run.result === "OK") title = t("transferHeroPhaseOk");
+  else if (run.result === "ABORT") title = t("transferHeroPhaseFail");
+  else if (run.phase === "DATA_TRANSFER" || run.phase === "VERIFY") title = t("transferHeroPhaseRunning");
+  else if (run.phase === "AUTH" || run.phase === "JOIN") title = t("transferHeroPhaseAuth");
+  else title = t("transferHeroPhaseIdle");
+  titleNode.textContent = title;
+
+  /* 文件路径：server input + client output。Sidebar 表单里保存的最新值。 */
+  const serverInput = byId("server-input-path")?.value || "—";
+  const clientOutput = byId("client-output-path")?.value || "—";
+  if (filesNode) filesNode.textContent = t("transferHeroFiles", {server: serverInput, client: clientOutput});
+
+  /* 时长 + 总大小 */
+  const flowLogs = appState.logs.filter((e) => e.flow_id === flowId);
+  const firstTime = flowLogs[0]?.time;
+  const lastTime = flowLogs[flowLogs.length - 1]?.time;
+  let duration = "—";
+  if (firstTime && lastTime) {
+    const ms = new Date(lastTime).getTime() - new Date(firstTime).getTime();
+    duration = ms > 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms} ms`;
+  }
+  if (metaNode) {
+    metaNode.textContent = t("transferHeroMeta", {
+      start: firstTime ? firstTime.split("T")[1]?.split(".")[0] || firstTime : "—",
+      duration,
+      total: formatBytes(run.totalBytes),
+    });
+  }
+
+  /* 右侧 stats：flow_id, attempts, packets */
+  const heroStats = byId("transfer-hero-stats");
+  if (heroStats) {
+    heroStats.innerHTML = `
+      <div class="metric"><span>Flow</span><strong class="mono">${escapeHtml(flowId)}</strong></div>
+      <div class="metric"><span>${t("attempts")}</span><strong>${run.attempts}/3</strong></div>
+      <div class="metric"><span>${t("dataPackets")}</span><strong>${run.dataRecv.length}</strong></div>
+      <div class="metric"><span>${t("result")}</span><strong>${resultLabel(run.result)}</strong></div>
+    `;
+  }
+}
+
+/* 2. 生命周期阶段条：IDLE → AUTH → TRANSFER → VERIFY → OK/ABORT */
+function renderLifecycle(run) {
+  const strip = byId("lifecycle-strip");
+  if (!strip) return;
+  const stages = [
+    {key: "IDLE",     label: t("stageIdle"),     match: () => true},
+    {key: "AUTH",     label: t("stageAuth"),     match: (r) => ["JOIN","AUTH"].includes(r.phase)},
+    {key: "TRANSFER", label: t("stageTransfer"), match: (r) => r.phase === "DATA_TRANSFER"},
+    {key: "VERIFY",   label: t("stageVerify"),   match: (r) => r.phase === "VERIFY" || r.phase === "DONE"},
+    {key: "DONE",     label: r => r.result === "ABORT" ? t("stageAbort") : t("stageDone"),
+      match: (r) => r.result === "OK" || r.result === "ABORT"},
+  ];
+  const aborted = run.result === "ABORT";
+  const isFinalDone = run.result === "OK";
+  /* currentIdx = 最高已通过的阶段。"通过"指的是 match() 为 true。
+     例如 DATA_TRANSFER 阶段时，IDLE/AUTH/TRANSFER 都 match，最高 = 2。*/
+  let currentIdx = 0;
+  for (let i = stages.length - 1; i >= 0; i -= 1) {
+    if (stages[i].match(run)) { currentIdx = i; break; }
+  }
+  strip.innerHTML = stages.map((s, i) => {
+    let cls;
+    if (aborted && i === stages.length - 1) {
+      cls = "is-abort";
+    } else if (i < currentIdx) {
+      cls = "is-done";
+    } else if (i === currentIdx) {
+      /* 最后阶段且 result=OK → 应该是"完成"视觉，不是"进行中" */
+      cls = (i === stages.length - 1 && isFinalDone) ? "is-done" : "is-current";
+    } else {
+      cls = "is-pending";
+    }
+    const label = typeof s.label === "function" ? s.label(run) : s.label;
+    return `<div class="lifecycle-step ${cls}">
+      <span class="lifecycle-dot"></span>
+      <span class="lifecycle-label">${escapeHtml(label)}</span>
+    </div>${i < stages.length - 1 ? '<span class="lifecycle-bar"></span>' : ''}`;
   }).join("");
-  byId("transfer-digest").innerHTML = digestMarkup(run, t("integrityCheck"));
+}
+
+/* 3. 进度面板 */
+function renderProgress(run, stats) {
+  const fill = byId("transfer-progress");
+  const label = byId("transfer-percent-label");
+  if (fill) fill.style.width = `${run.progress}%`;
+  if (label) label.textContent = `${run.progress}%`;
+
+  /* ETA */
+  let eta = t("etaPending");
+  if (run.result === "OK") eta = t("etaDone");
+  else if (stats.receivedCount > 0 && run.totalBytes > 0 && run.throughput > 0) {
+    const remainingBytes = Math.max(0, run.totalBytes - run.receivedBytes);
+    const sec = Math.round(remainingBytes / run.throughput);
+    if (sec > 0 && sec < 9999) eta = t("etaSuffix", {seconds: `${sec}s`});
+  }
+
+  const statsNode = byId("transfer-stats");
+  if (!statsNode) return;
+  statsNode.innerHTML = `
+    <div class="metric"><span>${t("progress")}</span><strong>${run.progress}%</strong></div>
+    <div class="metric"><span>${t("received")}</span><strong>${formatBytes(run.receivedBytes)} / ${formatBytes(run.totalBytes)}</strong></div>
+    <div class="metric"><span>${t("sent")}</span><strong>${formatBytes(run.sentBytes)}</strong></div>
+    <div class="metric"><span>${t("dataPackets")}</span><strong>${run.dataRecv.length}${run.dataSent.length ? ` / ${run.dataSent.length}` : ""}</strong></div>
+    <div class="metric eta-metric"><span>${t("etaLabel")}</span><strong>${escapeHtml(eta)}</strong></div>
+    <div class="metric loss-metric"><span>${t("legendLost")}</span><strong>${stats.lostCount}</strong></div>
+    <div class="metric dup-metric"><span>${t("legendDup")}</span><strong>${stats.dupCount}</strong></div>
+    <div class="metric oof-metric"><span>${t("legendOof")}</span><strong>${stats.oofCount}</strong></div>
+  `;
+}
+
+/* 4. 吞吐率时间线（sparkline）
+   **系统级实时仪表**，不跟 flow 绑定：
+   - 数据源固定为 appState.throughputSamples（每秒采样一次）
+   - bytes 是当前 allPackets 里所有 client 端 DATA 包的总字节数（跨所有 flow 累加）
+   - 切 flow / 切 tab / 跑测试都不影响——曲线持续演化
+   - reset 才清空 samples（重新开始 30s 窗口）*/
+function renderThroughput(run) {
+  const svg = byId("throughput-svg");
+  const label = byId("throughput-label");
+  const statsNode = byId("throughput-stats");
+  if (!svg) return;
+
+  const samples = appState.throughputSamples;
+  const rates = ratesFromSamples(samples);
+  const max = rates.length ? Math.max(...rates, 1) : 1;
+  const avg = rates.length ? rates.reduce((s, v) => s + v, 0) / rates.length : 0;
+  const peak = max;
+  const now = rates.length ? rates[rates.length - 1] || 0 : 0;
+  /* 窗口内总字节：最新 sample 的累计 - 最早 sample 的累计 */
+  const windowBytes = samples.length >= 2
+    ? Math.max(0, samples[samples.length - 1].bytes - samples[0].bytes)
+    : 0;
+
+  if (label) label.textContent = `${formatBytes(Math.round(now))}/s`;
+  if (statsNode) {
+    statsNode.innerHTML = `
+      <div class="metric"><span>${t("throughputNow")}</span><strong>${formatBytes(Math.round(now))}/s</strong></div>
+      <div class="metric"><span>${t("throughputAvg")}</span><strong>${formatBytes(Math.round(avg))}/s</strong></div>
+      <div class="metric"><span>${t("throughputPeak")}</span><strong>${formatBytes(Math.round(peak))}/s</strong></div>
+      <div class="metric"><span>${t("throughputWindow", {seconds: 30})}</span><strong>${formatBytes(windowBytes)}</strong></div>
+    `;
+  }
+
+  /* SVG 折线：X = sample index，Y = rate/max 归一化后反向（SVG Y 向下） */
+  const W = 240;
+  const H = 60;
+  if (rates.length < 2) {
+    svg.innerHTML = `<text x="${W/2}" y="${H/2 + 4}" text-anchor="middle" class="spark-empty">${escapeHtml(t("throughputIdle"))}</text>`;
+    return;
+  }
+  const N = rates.length;
+  const stepX = W / (N - 1);
+  const points = rates.map((r, i) => {
+    const x = (i * stepX).toFixed(2);
+    const y = (H - (r / max) * (H - 4) - 2).toFixed(2);
+    return `${x},${y}`;
+  });
+  const polyline = points.join(" ");
+  const areaPoints = `0,${H} ${polyline} ${W},${H}`;
+  const lastX = ((N - 1) * stepX).toFixed(2);
+  const lastY = (H - (rates[N - 1] / max) * (H - 4) - 2).toFixed(2);
+  /* 当前时间：取最新一个 sample 的时间戳 */
+  const lastSample = samples[samples.length - 1];
+  const timeLabel = lastSample ? formatTimeOfDay(new Date(lastSample.t)) : "";
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="currentColor" stop-opacity="0.45"/>
+        <stop offset="100%" stop-color="currentColor" stop-opacity="0.05"/>
+      </linearGradient>
+    </defs>
+    <polygon points="${areaPoints}" fill="url(#spark-grad)"/>
+    <polyline points="${polyline}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- "现在" 标记：虚线 + 时间文字（在数据线下方但在 area fill 之上） -->
+    <line x1="${W}" y1="2" x2="${W}" y2="${H - 4}" stroke="currentColor" stroke-width="0.6" stroke-dasharray="2,2" opacity="0.55"/>
+    <text x="${W - 3}" y="8" text-anchor="end" class="spark-now-text" font-size="6" font-family="ui-monospace, 'SF Mono', Menlo, monospace" fill="currentColor" opacity="0.85">${escapeHtml(timeLabel)}</text>
+    <circle cx="${lastX}" cy="${lastY}" r="2" fill="currentColor"/>
+  `;
+}
+
+/* 滑动窗口：每个采样点 = (bytes_i - bytes_{i-1}) / dt。第一个点为 0（无参考）。*/
+function ratesFromSamples(samples) {
+  const rates = [];
+  for (let i = 0; i < samples.length; i += 1) {
+    if (i === 0) {
+      rates.push(0);
+    } else {
+      const dt = Math.max(1, samples[i].t - samples[i - 1].t) / 1000;
+      const db = Math.max(0, samples[i].bytes - samples[i - 1].bytes);
+      rates.push(db / dt);
+    }
+  }
+  return rates;
+}
+
+/* 5. 分片矩阵 */
+function renderFragmentMatrix(run, stats) {
+  const matrix = byId("fragment-matrix");
+  const summary = byId("matrix-summary");
+  const legend = byId("matrix-legend");
+  if (!matrix) return;
+
+  /* 摘要 + 图例 */
+  if (summary) {
+    summary.innerHTML = `<span class="matrix-summary-text">${escapeHtml(t("matrixSummary", {
+      received: stats.receivedCount,
+      expected: stats.expectedCount || stats.receivedCount,
+      lost: stats.lostCount,
+      dup: stats.dupCount,
+      oof: stats.oofCount,
+    }))}</span>`;
+  }
+  if (legend) {
+    legend.innerHTML = `
+      <span class="legend-chip legend-received">${escapeHtml(t("legendReceived"))}</span>
+      ${appState.matrixView.showGaps ? `<span class="legend-chip legend-lost">${escapeHtml(t("legendLost"))}</span>` : ""}
+      ${appState.matrixView.showDup ? `<span class="legend-chip legend-dup">${escapeHtml(t("legendDup"))}</span>` : ""}
+      <span class="legend-chip legend-oof">${escapeHtml(t("legendOof"))}</span>
+      <span class="legend-chip legend-pending">${escapeHtml(t("legendPending"))}</span>
+    `;
+  }
+
+  /* 空态：没有任何 DATA 包。
+     必须用 is-empty class 把 grid 切到 block，否则 <p> 被 grid item 约束成 22px 宽，
+     中英文都按 1 字 1 行换行。*/
+  if (stats.expectedCount === 0 && stats.receivedCount === 0) {
+    const idle = run.phase === "AUTH" || run.phase === "JOIN"
+      ? t("matrixAuthOnly")
+      : t("matrixIdle");
+    matrix.classList.add("is-empty");
+    matrix.classList.remove("show-time");
+    matrix.innerHTML = `<p class="inspector-empty matrix-empty">${escapeHtml(idle)}</p>`;
+    return;
+  }
+
+  /* 非空态：恢复 grid 布局 */
+  matrix.classList.remove("is-empty");
+  matrix.classList.toggle("show-time", appState.matrixView.showTime);
+
+  /* 决定要画多少格：优先用 expectedCount，否则用 max(expectedCount, receivedCount)
+     兜底。最大 400 防爆。 */
+  const total = Math.min(Math.max(stats.expectedCount, stats.receivedCount, 1), 400);
+  const view = appState.matrixView;
+
+  /* 时间带：在每个分片格的顶部叠加一条细线表示"到达相对时间"。
+     我们只在该 flow 内的 RECV 上画。 */
+  const recvByTime = [...run.dataRecv].sort((a, b) => logTimeMs(a) - logTimeMs(b));
+  const firstRecvTime = recvByTime.length ? logTimeMs(recvByTime[0]) : 0;
+  const lastRecvTime = recvByTime.length ? logTimeMs(recvByTime[recvByTime.length - 1]) : 0;
+  const span = Math.max(1, lastRecvTime - firstRecvTime);
+  const recvTimeById = new Map();
+  for (const e of recvByTime) {
+    recvTimeById.set(Number(e.packet_id), logTimeMs(e));
+  }
+
+  let cells = "";
+  for (let id = 0; id < total; id += 1) {
+    const classes = ["fragment"];
+    const isReceived = stats.recvIds.has(id);
+    const isLost = stats.lostIds.has(id);
+    const isDup = stats.dupIds.has(id);
+    const isOof = stats.oofIds.has(id);
+    const isPending = stats.pendingIds.has(id) && !isReceived && !isLost;
+    if (isReceived) classes.push("received");
+    if (isDup && view.showDup) classes.push("dup");
+    if (isLost && view.showGaps) classes.push("lost");
+    if (isOof) classes.push("oof");
+    if (isPending) classes.push("pending");
+    if (id === appState.hoverFragmentId) classes.push("hovering");
+    cells += `<button class="${classes.join(" ")}" data-fragment-id="${id}" type="button" aria-label="DATA #${id}"></button>`;
+  }
+  matrix.innerHTML = cells;
+}
+
+/* 6. 完整性面板：直接写字段，不复用 digestMarkup（避免 h2 重复）。
+   digestMarkup 会自己生成 panel-head 的 h2，但我们这块面板已经有自己的 panel-head。 */
+function renderIntegrity(run) {
+  const node = byId("transfer-digest");
+  if (!node) return;
+  const state = run.clientDigest
+    ? (run.digestMatch ? t("digestMatch") : t("digestMismatch"))
+    : t("waiting");
+  const badgeClass = run.digestMatch ? "success" : run.clientDigest ? "danger" : "";
+  const clientOutput = byId("client-output-path")?.value || "";
+  const pathLabel = appState.language === "zh" ? "客户端路径" : "Client path";
+  const sizeLabel = appState.language === "zh" ? "期望大小" : "Expected size";
+  node.innerHTML = `
+    <div class="digest-status"><span class="badge ${badgeClass}">${escapeHtml(state)}</span></div>
+    <div class="digest-line"><span>${t("serverSha1")}</span><code>${escapeHtml(run.serverDigest || t("waiting"))}</code></div>
+    <div class="digest-line"><span>${t("clientSha1")}</span><code>${escapeHtml(run.clientDigest || t("waiting"))}</code></div>
+    ${clientOutput ? `<div class="digest-line"><span>${escapeHtml(pathLabel)}</span><code class="mono">${escapeHtml(clientOutput)}</code></div>` : ""}
+    <div class="digest-line"><span>${escapeHtml(sizeLabel)}</span><code>${escapeHtml(formatBytes(run.totalBytes))}</code></div>
+    <div class="digest-line"><span>${t("result")}</span><code>${escapeHtml(resultLabel(run.result))}</code></div>
+  `;
+}
+
+/* 7. 传输历史 */
+function renderTransferHistory() {
+  const list = byId("transfer-history-list");
+  const hint = byId("transfer-history-hint");
+  if (!list) return;
+  const flows = collectFlowHistory();
+  if (!flows.length) {
+    list.innerHTML = `<p class="inspector-empty">${escapeHtml(t("historyEmpty"))}</p>`;
+    if (hint) hint.textContent = "";
+    return;
+  }
+  if (hint) hint.textContent = t("historyCount", {count: flows.length});
+
+  const currentFlow = effectiveTransferFlowId();
+  list.innerHTML = flows.map((f) => {
+    const isCurrent = f.flowId === currentFlow;
+    const resultClass = f.result === "OK" ? "success" : f.result === "ABORT" ? "danger" : "";
+    const resultLabelText = f.result === "OK"
+      ? t("historyResultOk")
+      : f.result === "ABORT"
+        ? t("historyResultAbort")
+        : t("historyResultPending");
+    /* 持续时长 */
+    let duration = "—";
+    if (f.firstTime && f.lastTime) {
+      const ms = new Date(f.lastTime).getTime() - new Date(f.firstTime).getTime();
+      duration = ms > 1000 ? t("historyDurationS", {s: (ms / 1000).toFixed(2)}) : t("historyDurationMs", {ms});
+    }
+    return `<button class="history-row ${isCurrent ? "is-current" : ""}" data-history-flow="${escapeHtml(f.flowId)}" type="button">
+      <span class="history-flow-id mono">${escapeHtml(f.flowId)}</span>
+      <span class="history-meta">${f.packetsRecv}/${f.packetsSent} DATA · ${duration}</span>
+      <span class="badge ${resultClass}">${escapeHtml(resultLabelText)}</span>
+    </button>`;
+  }).join("");
+}
+
+function showFragmentTooltip(anchor, id, recv, sortedRecvs) {
+  const tip = byId("fragment-tooltip");
+  if (!tip) return;
+  const bytes = Number(recv.bytes || recv.payload_length || 0);
+  const time = recv.time ? recv.time.split("T")[1] || recv.time : "—";
+  /* 找前一个到达的包 */
+  const idx = sortedRecvs.indexOf(recv);
+  let content;
+  if (idx > 0) {
+    const prev = sortedRecvs[idx - 1];
+    const delta = logTimeMs(recv) - logTimeMs(prev);
+    content = t("fragmentTooltip", {
+      id,
+      bytes: formatBytes(bytes),
+      time,
+      prev: `#${prev.packet_id}`,
+      delta: delta < 1 ? "<1ms" : `${delta}ms`,
+    });
+  } else {
+    content = t("fragmentTooltipFirst", {id, bytes: formatBytes(bytes), time});
+  }
+  tip.textContent = content;
+  tip.hidden = false;
+  /* 用 fixed 定位（viewport 坐标），绕开 tooltip 跟 matrix 的相对关系问题。
+     CSS 已经配了 transform: translate(-50%, -100%) 让它居中悬浮在 cell 上方。*/
+  const cellRect = anchor.getBoundingClientRect();
+  tip.style.left = `${cellRect.left + cellRect.width / 2}px`;
+  tip.style.top = `${cellRect.top}px`;
+}
+
+function hideFragmentTooltip() {
+  const tip = byId("fragment-tooltip");
+  if (tip) tip.hidden = true;
+}
+
+/* 每秒采样一次系统级吞吐率，给 sparkline 用。
+   **不跟 flow 绑定**：bytes 是当前 allPackets 里所有 client-received DATA 的总字节数。
+   这样 sparkline 反映的是"系统此刻的实时吞吐率"，无论用户在看哪个 flow、是否在跑 transfer。*/
+function sampleThroughput() {
+  const totalBytes = appState.allPackets
+    .filter((e) => e.role === "client" && e.packet_type === "DATA")
+    .reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
+  appState.throughputSamples.push({t: Date.now(), bytes: totalBytes});
+  if (appState.throughputSamples.length > 30) appState.throughputSamples.shift();
 }
 
 function filteredLogs() {
@@ -1960,6 +2712,8 @@ function render() {
   renderTests();
   // 暴露给 theme-manager.js
   window.render = render;
+  /* 主动隐藏 tooltip（render 整体刷新后位置会失效） */
+  hideFragmentTooltip();
 }
 
 async function refreshStatus() {
@@ -2250,6 +3004,50 @@ function wireEvents() {
       render();
     });
   }
+  // 传输 tab：flow 选择器
+  byId("transfer-flow-select")?.addEventListener("change", (event) => {
+    appState.transferFlowId = event.currentTarget.value || null;
+    renderTransfer(deriveRun());
+  });
+  // 传输 tab：矩阵显示开关
+  ["matrix-show-dup", "matrix-show-gaps", "matrix-show-time"].forEach((id) => {
+    const node = byId(id);
+    if (!node) return;
+    node.addEventListener("change", () => {
+      appState.matrixView = {
+        showDup: byId("matrix-show-dup")?.checked ?? true,
+        showGaps: byId("matrix-show-gaps")?.checked ?? true,
+        showTime: byId("matrix-show-time")?.checked ?? false,
+      };
+      renderTransfer(deriveRun());
+    });
+  });
+  // 矩阵 hover：tooltip
+  const matrixNode = byId("fragment-matrix");
+  if (matrixNode) {
+    matrixNode.addEventListener("mouseover", (event) => {
+      const cell = event.target.closest("[data-fragment-id]");
+      if (!cell) return;
+      const id = Number(cell.dataset.fragmentId);
+      const flowId = effectiveTransferFlowId();
+      if (!flowId) return;
+      /* 用 allPackets（未去重），才能找到 client 端 RECV_DATA 记录 */
+      const recvs = appState.allPackets
+        .filter((e) => e.flow_id === flowId && e.role === "client" && e.packet_type === "DATA")
+        .sort((a, b) => logTimeMs(a) - logTimeMs(b));
+      const recv = recvs.find((e) => Number(e.packet_id) === id);
+      if (!recv) return;
+      appState.hoverFragmentId = id;
+      showFragmentTooltip(cell, id, recv, recvs);
+    });
+    matrixNode.addEventListener("mouseout", (event) => {
+      const cell = event.target.closest("[data-fragment-id]");
+      if (!cell) return;
+      appState.hoverFragmentId = null;
+      hideFragmentTooltip();
+    });
+  }
+
   // 时间分段控件：5 段单选（全部 / 1m / 5m / 30m / 自定义）
   // 选 "custom" 才显示 datetime 输入行；其他段隐藏输入并用预设规则
   const segGroup = byId("log-time-range");
@@ -2393,6 +3191,16 @@ function wireEvents() {
       }
       appState.activeTab = "protocol";
       document.querySelector("[data-tab='protocol']").click();
+      return;
+    }
+    const historyRow = event.target.closest("[data-history-flow]");
+    if (historyRow) {
+      const flowId = historyRow.dataset.historyFlow;
+      if (flowId) {
+        appState.transferFlowId = flowId;
+        renderTransfer(deriveRun());
+      }
+      return;
     }
   });
 
@@ -2545,6 +3353,13 @@ async function boot() {
   connectWebSocket();
   setInterval(refreshStatus, 2500);
   setInterval(refreshLogs, 6000);
+  /* 吞吐率采样：每秒一次。sparkline 渲染也走同一周期。 */
+  setInterval(() => {
+    sampleThroughput();
+    if (appState.activeTab === "transfer") {
+      renderThroughput(deriveRun());
+    }
+  }, 1000);
 }
 
 boot();

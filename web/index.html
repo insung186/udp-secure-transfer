@@ -368,23 +368,90 @@
         </section>
 
         <section class="tab-panel" id="tab-transfer" aria-label="Transfer">
-          <div class="transfer-grid">
+          <div class="transfer-stack">
+
+            <!-- 1. Hero: 上下文 + Flow 选择器 -->
+            <section class="panel transfer-hero-panel">
+              <div class="hero-left">
+                <p class="caption" data-i18n="transferContext">当前传输</p>
+                <h2 id="transfer-hero-title">—</h2>
+                <p id="transfer-hero-files" class="hero-files">—</p>
+                <p id="transfer-hero-meta" class="hero-meta">—</p>
+              </div>
+              <div class="hero-right">
+                <label class="flow-picker">
+                  <span class="label-text" data-i18n="flowSelector">Flow</span>
+                  <select id="transfer-flow-select" aria-label="Flow"></select>
+                </label>
+                <div class="hero-stats" id="transfer-hero-stats"></div>
+              </div>
+            </section>
+
+            <!-- 2. 生命周期阶段条 -->
+            <section class="panel lifecycle-panel">
+              <div class="lifecycle-strip" id="lifecycle-strip"></div>
+            </section>
+
+            <!-- 3. 吞吐率（在上）+ 进度（在下） -->
+            <section class="panel throughput-panel">
+              <div class="panel-head">
+                <h2 data-i18n="transferThroughput">吞吐率时间线</h2>
+                <span class="hint" id="throughput-label">0 B/s</span>
+              </div>
+              <div class="throughput-spark" id="throughput-spark">
+                <svg id="throughput-svg" viewBox="0 0 240 60" preserveAspectRatio="none" aria-hidden="true"></svg>
+              </div>
+              <div class="throughput-stats" id="throughput-stats"></div>
+            </section>
             <section class="panel progress-panel">
               <div class="panel-head">
                 <h2 data-i18n="transferProgress">传输进度</h2>
-                <span class="hint" id="throughput-label">0 B/s</span>
+                <span class="hint" id="transfer-percent-label">0%</span>
               </div>
               <div class="progress-track"><div id="transfer-progress" class="progress-fill"></div></div>
               <div class="transfer-stats" id="transfer-stats"></div>
             </section>
+
+            <!-- 4. 分片矩阵 -->
             <section class="panel matrix-panel">
               <div class="panel-head">
                 <h2 data-i18n="fragmentMatrix">分片矩阵</h2>
-                <span class="hint" data-i18n="fragmentHint">每格代表一个 DATA packet_id</span>
+                <div class="matrix-summary" id="matrix-summary"></div>
+              </div>
+              <div class="matrix-toolbar">
+                <label class="matrix-toggle">
+                  <input type="checkbox" id="matrix-show-dup" checked>
+                  <span data-i18n="matrixShowDup">显示重复</span>
+                </label>
+                <label class="matrix-toggle">
+                  <input type="checkbox" id="matrix-show-gaps" checked>
+                  <span data-i18n="matrixShowGaps">标出缺口</span>
+                </label>
+                <label class="matrix-toggle">
+                  <input type="checkbox" id="matrix-show-time">
+                  <span data-i18n="matrixShowTime">显示时间带</span>
+                </label>
+                <div class="matrix-legend" id="matrix-legend"></div>
               </div>
               <div class="fragment-matrix" id="fragment-matrix"></div>
+              <div class="fragment-tooltip" id="fragment-tooltip" hidden></div>
             </section>
-            <section class="panel digest-panel-wide" id="transfer-digest"></section>
+
+            <!-- 5. 完整性校验 + 传输历史 -->
+            <section class="panel integrity-panel">
+              <div class="panel-head">
+                <h2 data-i18n="integrityCheck">完整性校验</h2>
+              </div>
+              <div class="digest-lines" id="transfer-digest"></div>
+            </section>
+            <section class="panel transfer-history-panel">
+              <div class="panel-head">
+                <h2 data-i18n="transferHistory">传输历史</h2>
+                <span class="hint" id="transfer-history-hint"></span>
+              </div>
+              <div class="transfer-history-list" id="transfer-history-list"></div>
+            </section>
+
           </div>
         </section>
 
