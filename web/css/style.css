@@ -59,7 +59,7 @@ h2 {
 }
 
 h3 {
-  font-size: 0.94rem;
+  font-size: 0.9rem;
   line-height: 1.25;
 }
 
@@ -570,19 +570,108 @@ h3 {
 }
 
 .dashboard-grid {
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.72fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 0.85fr);
   align-items: stretch;
+}
+
+/* 当前运行：占满整行（第 1 行） */
+.hero-panel {
+  grid-column: 1 / -1;
+}
+
+/* 当前协议摘要 / 传输摘要 / SHA1 摘要：在第 2 行三列不等宽 */
+.dashboard-grid .protocol-summary-panel {
+  grid-column: 1;
+}
+.dashboard-grid .metrics-panel {
+  grid-column: 2;
+}
+.dashboard-grid .digest-panel {
+  grid-column: 3;
+}
+.dashboard-grid .protocol-summary-panel,
+.dashboard-grid .metrics-panel,
+.dashboard-grid .digest-panel {
+  min-height: 220px;
 }
 
 .hero-panel {
   display: grid;
-  grid-template-columns: minmax(240px, 0.9fr) minmax(260px, 1.1fr);
-  gap: 18px;
-  min-height: 320px;
-  align-items: center;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.9fr);
+  gap: 22px;
+  align-items: stretch;
   background: var(--glass);
   position: relative;
   overflow: hidden;
+  padding: 16px 20px;
+}
+
+/* 左半：标题 + 摘要 */
+.hero-panel .hero-summary {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hero-panel .hero-summary h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+
+.hero-panel .hero-summary p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  max-width: 56ch;
+}
+
+/* 右半：当前运行（标签 + 6 张阶段卡） */
+.hero-panel .hero-status {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hero-panel .hero-status-caption {
+  margin: 0;
+  letter-spacing: 0.04em;
+}
+
+.hero-panel .phase-rail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.hero-panel .phase-rail .phase-step {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  min-height: 0;
+}
+
+.hero-panel .phase-rail .phase-step strong {
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hero-panel .phase-rail .phase-step .bar {
+  height: 6px;
+}
+
+.hero-panel .phase-rail .phase-step > span:last-child {
+  text-align: right;
+  font-size: 0.74rem;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 :root[data-theme="aurora"] .hero-panel {
@@ -609,8 +698,10 @@ h3 {
 }
 
 .dashboard-side {
+  /* legacy wrapper — retained only for safety if markup reverts */
   display: grid;
   gap: 14px;
+  grid-column: 1 / -1;
 }
 
 .hero-panel h2 {
@@ -657,7 +748,11 @@ h3 {
 
 .protocol-summary-panel {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+}
+
+.protocol-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .protocol-summary-copy {
@@ -683,13 +778,36 @@ h3 {
 
 .protocol-compare-row {
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.protocol-compare-row > label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.protocol-compare-row > label .label-text {
+  margin: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.protocol-compare-row select {
+  width: 100%;
+  min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.86rem;
+  padding: 5px 8px;
 }
 
 .protocol-compare-card {
   display: grid;
   gap: 6px;
-  padding: 12px;
+  padding: 10px 12px;
   border-radius: var(--control-radius);
   background: color-mix(in oklch, var(--primary) 8%, var(--surface));
   border: var(--border-width, 1px) var(--border-style, solid) color-mix(in oklch, var(--primary) 30%, var(--line));
@@ -777,7 +895,7 @@ label {
   display: grid;
   gap: 6px;
   color: var(--ink);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1331,7 +1449,7 @@ select:focus-visible {
   background: transparent;
   padding: 4px 8px;
   font-family: inherit;
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--muted);
   cursor: pointer;
@@ -1486,7 +1604,7 @@ select:focus-visible {
 }
 
 .time-range-label {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--muted);
   font-weight: 600;
 }
@@ -1624,6 +1742,65 @@ input[type="datetime-local"]:hover:not(:focus) {
 .test-action-grid button {
   width: 100%;
   min-width: 0;
+}
+
+/* 实验控制 + 自动测试套件：上下两行展示，各占一行，统一样式 */
+.run-test-combo-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.run-test-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--card-radius, var(--radius));
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+  background: transparent;
+}
+
+.run-test-cell .panel-head {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.run-test-cell .panel-head h2 {
+  font-size: 0.86rem;
+}
+
+.run-test-cell .hint {
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+/* 单元格内按钮：统一样式——撑满单元格、文本强制单行、明确中性背景，避免主题里 danger/warning 混入 */
+.run-test-cell .run-test-action {
+  width: 100%;
+  min-height: 40px;
+  white-space: nowrap;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  gap: 6px;
+  justify-content: center;
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--ink);
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+}
+
+.run-test-cell .run-test-action.primary-button {
+  color: var(--text-on-primary, #fff);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.run-test-cell .shape-icon {
+  flex-shrink: 0;
 }
 
 .filter-row {
@@ -1817,7 +1994,7 @@ input[type="datetime-local"]:hover:not(:focus) {
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
 }
 :root[data-theme="cyber"] .ghost-button:hover,
 :root[data-theme="cyber"] .icon-button:hover,
@@ -2113,7 +2290,7 @@ input[type="datetime-local"]:hover:not(:focus) {
 .metric strong {
   display: block;
   margin-top: 4px;
-  font-size: 1.18rem;
+  font-size: 1.2rem;
   overflow-wrap: anywhere;
 }
 
@@ -2181,6 +2358,40 @@ input[type="datetime-local"]:hover:not(:focus) {
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 1.2px;
+}
+
+.sequence-panel .panel-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sequence-flow-toolbar {
+  margin-left: auto;
+}
+
+.sequence-flow-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.sequence-flow-picker .label-text {
+  margin: 0;
+  font-weight: 600;
+}
+
+.sequence-flow-picker select {
+  min-width: 132px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.86rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
 }
 
 :root[data-theme="cyber"] .sequence-legend,
@@ -2584,7 +2795,7 @@ tr.is-selected {
 
 .field-list span {
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.86rem;
   display: flex;
   align-items: center;
   min-height: 22px;
@@ -2599,7 +2810,7 @@ tr.is-selected {
   align-items: center;
   min-height: 22px;
   font-weight: 600;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
 }
 
 :root[data-theme="metal"] .field-list strong {
@@ -2635,7 +2846,7 @@ tr.is-selected {
 .inspector-debug > summary::before {
   content: "▶";
   display: inline-block;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   transition: transform 180ms ease;
 }
 
@@ -2663,7 +2874,7 @@ tr.is-selected {
   border-radius: 12px;
   background: color-mix(in oklch, var(--surface) 72%, transparent);
   border: var(--border-width, 1px) var(--border-style, solid) color-mix(in oklch, var(--line) 72%, transparent);
-  font-size: 0.84rem;
+  font-size: 0.86rem;
 }
 
 .paired-row > * {
@@ -2965,53 +3176,77 @@ tbody tr:last-child td {
   grid-column: 1 / -1;
 }
 
-/* Hero */
+/* Hero：垂直布局——上方 header（标题+元信息 + Flow 选择器），下方 stats 满宽一行 */
 .transfer-hero-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 18px;
-  align-items: center;
-  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  padding: 14px 20px;
   background: var(--glass);
 }
+
+.transfer-hero-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+  min-width: 0;
+}
+
+.transfer-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .transfer-hero-panel h2 {
-  font-size: 1.4rem;
-  margin: 6px 0;
+  font-size: 1.6rem;
+  margin: 4px 0;
+  letter-spacing: 0.01em;
 }
 .hero-files {
   font-family: var(--mono, ui-monospace, "SF Mono", Menlo, monospace);
-  color: var(--muted);
+  color: var(--text);
   font-size: 0.9rem;
-  margin: 4px 0 2px;
+  margin: 6px 0 2px;
   word-break: break-all;
 }
 .hero-meta {
   color: var(--muted);
-  font-size: 0.85rem;
-  margin: 2px 0 0;
-}
-.hero-right {
-  display: grid;
-  gap: 10px;
-  align-content: center;
+  font-size: 0.9rem;
+  margin: 4px 0 0;
 }
 .flow-picker {
   display: grid;
-  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+}
+.flow-picker .label-text {
+  margin: 0;
 }
 .flow-picker select {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
 }
 .hero-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  /* 8 个 metric：1 行 × 8 列，满宽 */
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-auto-flow: row;
+  gap: 8px 8px;
+  width: 100%;
 }
 .hero-stats .metric strong {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   word-break: break-all;
+}
+.hero-stats .metric span {
+  font-size: 0.72rem;
 }
 
 /* 生命周期条 */
@@ -3104,16 +3339,25 @@ tbody tr:last-child td {
 
 /* 吞吐率面板 */
 .throughput-panel { display: flex; flex-direction: column; }
+.throughput-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#throughput-clock {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.02em;
+}
 .throughput-spark {
   flex: 1;
-  min-height: 120px;
-  height: 140px;
+  min-height: 64px;
+  height: 80px;
   position: relative;
   color: var(--primary);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   overflow: hidden;
 }
 .throughput-spark svg {
@@ -3158,7 +3402,7 @@ tbody tr:last-child td {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   color: var(--muted);
   cursor: pointer;
   min-height: 0;
@@ -3361,7 +3605,7 @@ tbody tr:last-child td {
 }
 .history-flow-id {
   grid-column: 1 / -1;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   color: var(--ink);
 }
 .history-meta {
@@ -3379,7 +3623,10 @@ tbody tr:last-child td {
     grid-template-columns: 1fr;
   }
   .transfer-hero-panel {
-    grid-template-columns: 1fr;
+    /* flex-direction: column 在窄屏保持垂直堆叠；只是让 header 也纵向堆 */
+  }
+  .transfer-hero-header {
+    grid-template-columns: minmax(0, 1fr);
   }
   .hero-stats,
   .transfer-stats,
@@ -3440,7 +3687,7 @@ tbody tr:last-child td {
   background: var(--surface);
   text-transform: uppercase;
   letter-spacing: 1px;
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   font-weight: 700;
   text-align: center;
   padding: 0 10px;
@@ -3486,7 +3733,7 @@ tbody tr:last-child td {
   height: 40px;
   padding: 0 10px;
   border-bottom: var(--border-width, 1px) var(--border-style, solid) var(--line);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   vertical-align: middle;
   text-align: center;
   overflow: hidden;

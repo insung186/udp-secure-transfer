@@ -67,6 +67,34 @@
             </div>
           </section>
 
+          <section class="control-section sidebar-form run-test-combo">
+            <div class="run-test-combo-row">
+              <div class="run-test-cell">
+                <div class="panel-head">
+                  <h2 data-i18n="experimentControl">实验控制</h2>
+                  <span class="hint" data-i18n="runHint">运行</span>
+                </div>
+                <div class="button-row">
+                  <button class="ghost-button run-test-action" id="reset-btn" type="button">
+                    <span class="shape-icon icon-reset" aria-hidden="true"></span>
+                    <span data-i18n="resetRun">重置实验</span>
+                  </button>
+                </div>
+              </div>
+              <div class="run-test-cell test-control-panel">
+                <div class="panel-head">
+                  <h2 data-i18n="testsAndSim">自动测试套件</h2>
+                  <span class="hint" data-i18n="scriptResults">自动脚本结果</span>
+                </div>
+                <p class="hint" data-i18n="testsAndSimHint">"认证失败" 与 "超时" 等场景请通过上方"协议与场景"运行；本面板只负责运行自动化测试脚本。</p>
+                <div class="test-action-grid">
+                  <button class="primary-button run-test-action" id="run-tests-btn" type="button" data-i18n="runTests">运行测试</button>
+                </div>
+              </div>
+            </div>
+            <div id="test-results" class="test-results"></div>
+          </section>
+
           <form class="control-section sidebar-form" id="server-form">
             <div class="panel-head">
               <h2 data-i18n="server">服务端</h2>
@@ -202,32 +230,6 @@
 
           <section class="control-section sidebar-form">
             <div class="panel-head">
-              <h2 data-i18n="experimentControl">实验控制</h2>
-              <span class="hint" data-i18n="runHint">运行</span>
-            </div>
-            <div class="button-row">
-              <button class="ghost-button" id="reset-btn" type="button">
-                <span class="shape-icon icon-reset" aria-hidden="true"></span>
-                <span data-i18n="resetRun">重置实验</span>
-              </button>
-            </div>
-          </section>
-
-          <section class="control-section sidebar-form test-control-panel">
-            <div class="panel-head">
-              <h2 data-i18n="testsAndSim">测试与异常模拟</h2>
-              <span class="hint" data-i18n="scriptResults">自动脚本结果</span>
-            </div>
-            <div class="test-action-grid">
-              <button class="primary-button" id="run-tests-btn" type="button" data-i18n="runTests">运行测试</button>
-              <button class="ghost-button" id="simulate-wrong-btn" type="button" data-i18n="simulateWrong">模拟认证失败</button>
-              <button class="ghost-button" id="simulate-timeout-btn" type="button" data-i18n="simulateTimeout">模拟超时</button>
-            </div>
-            <div id="test-results" class="test-results"></div>
-          </section>
-
-          <section class="control-section sidebar-form">
-            <div class="panel-head">
               <h2 data-i18n="appearance">界面设置</h2>
               <span class="hint" data-i18n="appearanceHint">显示</span>
             </div>
@@ -273,18 +275,18 @@
         <section class="tab-panel is-active" id="tab-dashboard" aria-label="Dashboard">
           <div class="dashboard-grid">
             <section class="panel hero-panel">
-              <div>
-                <p class="caption" data-i18n="currentRun">当前运行</p>
+              <header class="hero-summary">
                 <h2 id="dashboard-title">等待启动</h2>
                 <p id="dashboard-summary">启动 server 和 client 后，这里会展示认证、传输和校验结果。</p>
+              </header>
+              <div class="hero-status" aria-label="当前运行">
+                <p class="caption hero-status-caption" data-i18n="currentRun">当前运行</p>
+                <div class="phase-rail" id="dashboard-phases"></div>
               </div>
-              <div class="phase-rail" id="dashboard-phases"></div>
             </section>
-            <div class="dashboard-side">
-              <section class="panel protocol-summary-panel" id="protocol-summary-panel"></section>
-              <section class="panel metrics-panel" id="metrics-panel"></section>
-              <section class="panel digest-panel" id="digest-panel"></section>
-            </div>
+            <section class="panel protocol-summary-panel" id="protocol-summary-panel"></section>
+            <section class="panel metrics-panel" id="metrics-panel"></section>
+            <section class="panel digest-panel" id="digest-panel"></section>
             <section class="panel recent-panel">
               <div class="panel-head">
                 <h2 data-i18n="recentLogs">最近日志</h2>
@@ -303,6 +305,12 @@
             <section class="panel sequence-panel">
               <div class="panel-head">
                 <h2 data-i18n="protocolSequence">协议时序</h2>
+                <div class="panel-tools sequence-flow-toolbar">
+                  <label class="sequence-flow-picker">
+                    <span class="label-text" data-i18n="flowSelector">Flow</span>
+                    <select id="sequence-flow-select" aria-label="Flow"></select>
+                  </label>
+                </div>
               </div>
               <div class="sequence-legend" aria-hidden="true">
                 <span data-i18n="clientEndpoint">客户端</span>
@@ -395,21 +403,21 @@
         <section class="tab-panel" id="tab-transfer" aria-label="Transfer">
           <div class="transfer-stack">
 
-            <!-- 1. Hero: 上下文 + Flow 选择器 -->
+            <!-- 1. Hero: 上下文（标题+元信息） + Flow 选择器 + 8 项 stats 满宽一行 -->
             <section class="panel transfer-hero-panel">
-              <div class="hero-left">
-                <p class="caption" data-i18n="transferContext">当前传输</p>
-                <h2 id="transfer-hero-title">—</h2>
-                <p id="transfer-hero-files" class="hero-files">—</p>
-                <p id="transfer-hero-meta" class="hero-meta">—</p>
-              </div>
-              <div class="hero-right">
+              <header class="transfer-hero-header">
+                <div class="transfer-hero-text">
+                  <p class="caption" data-i18n="transferContext">当前传输</p>
+                  <h2 id="transfer-hero-title">—</h2>
+                  <p id="transfer-hero-files" class="hero-files">—</p>
+                  <p id="transfer-hero-meta" class="hero-meta">—</p>
+                </div>
                 <label class="flow-picker">
                   <span class="label-text" data-i18n="flowSelector">Flow</span>
                   <select id="transfer-flow-select" aria-label="Flow"></select>
                 </label>
-                <div class="hero-stats" id="transfer-hero-stats"></div>
-              </div>
+              </header>
+              <div class="hero-stats" id="transfer-hero-stats"></div>
             </section>
 
             <!-- 2. 生命周期阶段条 -->
@@ -421,7 +429,10 @@
             <section class="panel throughput-panel">
               <div class="panel-head">
                 <h2 data-i18n="transferThroughput">吞吐率时间线</h2>
-                <span class="hint" id="throughput-label">0 B/s</span>
+                <div class="throughput-head-meta">
+                  <span class="hint" id="throughput-clock" title="当前时间">—</span>
+                  <span class="hint" id="throughput-label">0 B/s</span>
+                </div>
               </div>
               <div class="throughput-spark" id="throughput-spark">
                 <svg id="throughput-svg" viewBox="0 0 240 60" preserveAspectRatio="none" aria-hidden="true"></svg>

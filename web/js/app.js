@@ -194,6 +194,7 @@ const i18n = {
     fragmentHint: "每格代表一个 DATA packet_id",
     transferContext: "当前传输",
     flowSelector: "Flow",
+    autoFlow: "自动（最近）",
     transferHeroIdle: "等待启动服务端和客户端",
     transferHeroNoFlow: "尚未产生传输 flow",
     transferHeroFiles: "{server} → {client}",
@@ -264,7 +265,8 @@ const i18n = {
     pairedSenderLog: "发送端记录",
     pairedReceiverLog: "接收端记录",
     pairedOtherLog: "对端记录",
-    testsAndSim: "测试与异常模拟",
+    testsAndSim: "自动测试套件",
+    testsAndSimHint: "「认证失败」「超时」等场景请通过上方「协议与场景」运行；本面板只运行自动化测试脚本。",
     scriptResults: "自动脚本结果",
     runTests: "运行测试",
     simulateWrong: "模拟认证失败",
@@ -487,6 +489,7 @@ const i18n = {
     fragmentHint: "Each cell represents one DATA packet_id",
     transferContext: "Current Transfer",
     flowSelector: "Flow",
+    autoFlow: "Auto (latest)",
     transferHeroIdle: "Start the server and client to begin a transfer.",
     transferHeroNoFlow: "No transfer flow yet",
     transferHeroFiles: "{server} → {client}",
@@ -557,7 +560,8 @@ const i18n = {
     pairedSenderLog: "Sender record",
     pairedReceiverLog: "Receiver record",
     pairedOtherLog: "Peer record",
-    testsAndSim: "Tests & failure simulation",
+    testsAndSim: "Automated test suite",
+    testsAndSimHint: "Scenarios like \"auth failure\" or \"timeout\" are run from the \"Protocol & scenarios\" panel above. This panel only runs the automated test scripts.",
     scriptResults: "Automated script results",
     runTests: "Run tests",
     simulateWrong: "Simulate wrong auth",
@@ -706,10 +710,10 @@ function formatBytes(bytes) {
   return `${(value / 1024 / 1024).toFixed(2)} MB`;
 }
 
-/* HH:MM:SS — 给 sparkline 的"now 标记"用 */
+/* YYYY-MM-DD HH:MM:SS — 给 sparkline 的"now 标记"用 */
 function formatTimeOfDay(d) {
   const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 function sleep(ms) {
@@ -1983,16 +1987,12 @@ function renderProtocolSummaryCard(run) {
   node.innerHTML = `
     <div class="panel-head">
       <h2>${escapeHtml(appState.language === "zh" ? "当前协议摘要" : "Protocol summary")}</h2>
-      <span class="hint">${escapeHtml(appState.language === "zh" ? "统一实验台 / 协议画像" : "Unified lab / protocol profile")}</span>
+      <span class="hint">${escapeHtml(appState.language === "zh" ? "协议画像" : "Profile")}</span>
     </div>
-    <div class="metric-grid">
+    <div class="metric-grid protocol-summary-grid">
       <div class="metric"><span>${t("protocolLabel")}</span><strong>${escapeHtml(current?.name || currentId)}</strong></div>
-      <div class="metric"><span>${t("transportLabel")}</span><strong>${escapeHtml(current?.transport || run.transport || "-")}</strong></div>
       <div class="metric"><span>${t("scenarioLabel")}</span><strong>${escapeHtml(scenarioDisplayName(run.scenario || appState.selectedScenario, currentId))}</strong></div>
-      <div class="metric"><span>${escapeHtml(appState.language === "zh" ? "视图" : "View")}</span><strong>${escapeHtml(protocolTransferView(currentId))}</strong></div>
     </div>
-    <p class="protocol-summary-copy">${escapeHtml(protocolSummary(currentId) || current?.name || currentId)}</p>
-    <p class="protocol-summary-copy">${escapeHtml(currentScenarioDef()?.description || "")}</p>
     <div class="protocol-stage-line"><span>${escapeHtml(appState.language === "zh" ? "时序阶段" : "Sequence")}</span><code>${escapeHtml(currentStages || "-")}</code></div>
     <div class="protocol-compare-row">
       <label>
@@ -2003,7 +2003,6 @@ function renderProtocolSummaryCard(run) {
       </label>
       ${compare ? `<div class="protocol-compare-card">
         <strong>${escapeHtml(compare.name || compare.id)}</strong>
-        <span>${escapeHtml(compare.transport || "-")} · ${escapeHtml(protocolTransferView(compare.id))}</span>
         <code>${escapeHtml(compareStages || "-")}</code>
       </div>` : ""}
     </div>
@@ -2199,6 +2198,8 @@ function renderProtocol() {
   const packets = filteredPackets();
   // 同步下拉选项：flow_id / state 需要根据当前 realPackets 动态生成
   syncPacketFilterOptions();
+  // 同步协议时序的 flow 选择器
+  syncSequenceFlowOptions();
   const packetPage = paginate(packets, appState.pagination.packets, appState.packetFilters.sort);
   const sequenceFlowId = currentSequenceFlowId();
   const sequenceItems = sequencePackets(sequenceFlowId);
@@ -2547,13 +2548,12 @@ function renderTransferHero(run, flowId) {
     });
   }
 
-  /* 右侧 stats：flow_id, attempts, packets */
+  /* 右侧 stats：去掉 Flow 一项（与上方 flow 选择器重复），剩下 8 项按 4 列 × 2 行 */
   const heroStats = byId("transfer-hero-stats");
   if (heroStats) {
     heroStats.innerHTML = `
       <div class="metric"><span>${t("protocolLabel")}</span><strong>${escapeHtml(protocolDisplayName(run.protocol || appState.selectedProtocol))}</strong></div>
       <div class="metric"><span>${t("scenarioLabel")}</span><strong>${escapeHtml(scenarioDisplayName(run.scenario || appState.selectedScenario, run.protocol || appState.selectedProtocol))}</strong></div>
-      <div class="metric"><span>Flow</span><strong class="mono">${escapeHtml(flowId)}</strong></div>
       <div class="metric"><span>${t("sessionId")}</span><strong class="mono">${escapeHtml(run.sessionId || appState.status.experiment?.session_id || "-")}</strong></div>
       <div class="metric"><span>${t("attempts")}</span><strong>${run.attempts || 0}${run.attempts ? "/3" : ""}</strong></div>
       <div class="metric"><span>${t("dataPackets")}</span><strong>${run.dataRecv.length}</strong></div>
@@ -2654,6 +2654,7 @@ function renderProgress(run, stats) {
 function renderThroughput(run) {
   const svg = byId("throughput-svg");
   const label = byId("throughput-label");
+  const clockNode = byId("throughput-clock");
   const statsNode = byId("throughput-stats");
   if (!svg) return;
 
@@ -2669,6 +2670,7 @@ function renderThroughput(run) {
     : 0;
 
   if (label) label.textContent = `${formatBytes(Math.round(now))}/s`;
+  if (clockNode) clockNode.textContent = formatTimeOfDay(new Date());
   if (statsNode) {
     statsNode.innerHTML = `
       <div class="metric"><span>${t("throughputNow")}</span><strong>${formatBytes(Math.round(now))}/s</strong></div>
@@ -2696,9 +2698,7 @@ function renderThroughput(run) {
   const areaPoints = `0,${H} ${polyline} ${W},${H}`;
   const lastX = ((N - 1) * stepX).toFixed(2);
   const lastY = (H - (rates[N - 1] / max) * (H - 4) - 2).toFixed(2);
-  /* 当前时间：取最新一个 sample 的时间戳 */
-  const lastSample = samples[samples.length - 1];
-  const timeLabel = lastSample ? formatTimeOfDay(new Date(lastSample.t)) : "";
+  /* 当前时间显示在 panel-head 的 #throughput-clock（YYYY-MM-DD HH:MM:SS），SVG 内不再重复 */
   svg.innerHTML = `
     <defs>
       <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
@@ -2708,9 +2708,8 @@ function renderThroughput(run) {
     </defs>
     <polygon points="${areaPoints}" fill="url(#spark-grad)"/>
     <polyline points="${polyline}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
-    <!-- "现在" 标记：虚线 + 时间文字（在数据线下方但在 area fill 之上） -->
+    <!-- "现在" 标记：右端虚线 + 数据点（时间由 panel-head 时钟承载） -->
     <line x1="${W}" y1="2" x2="${W}" y2="${H - 4}" stroke="currentColor" stroke-width="0.6" stroke-dasharray="2,2" opacity="0.55"/>
-    <text x="${W - 3}" y="8" text-anchor="end" class="spark-now-text" font-size="6" font-family="ui-monospace, 'SF Mono', Menlo, monospace" fill="currentColor" opacity="0.85">${escapeHtml(timeLabel)}</text>
     <circle cx="${lastX}" cy="${lastY}" r="2" fill="currentColor"/>
   `;
 }
@@ -3050,6 +3049,31 @@ function syncPacketFilterOptions() {
   appState.packetFilters.state = stateSel.value;
 }
 
+/* 协议时序 flow 选择器：根据 appState.realPackets 收集 flow_id，加上"自动（最近）"一项。 */
+function syncSequenceFlowOptions() {
+  const sel = byId("sequence-flow-select");
+  if (!sel) return;
+  const flows = new Set();
+  for (const p of appState.realPackets) {
+    if (p.flow_id) flows.add(p.flow_id);
+  }
+  // 按时间倒序：最后出现的 flow 排第一
+  const seen = new Set();
+  const ordered = [];
+  for (let i = appState.realPackets.length - 1; i >= 0; i -= 1) {
+    const id = appState.realPackets[i].flow_id;
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      ordered.push(id);
+    }
+  }
+  const current = appState.selectedFlowId || "";
+  sel.innerHTML = `<option value="" data-i18n="autoFlow">${escapeHtml(t("autoFlow") || "Auto (latest)")}</option>` +
+    ordered.map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join("");
+  // 只在用户已显式选择 flow 时把 select 锁住；否则保持"Auto"
+  sel.value = (current && ordered.includes(current)) ? current : "";
+}
+
 /* 维护 log 事件下拉：根据 appState.logs 收集所有出现过的 event 名。 */
 function syncLogEventOptions() {
   const sel = byId("log-event-filter");
@@ -3182,11 +3206,11 @@ function formObject(form) {
 
 async function runScenarioById(scenarioId) {
   if (scenarioId === "auth-failure") {
-    document.querySelector("#simulate-wrong-btn")?.click();
+    await simulateAuthFailure();
     return;
   }
   if (scenarioId === "timeout") {
-    document.querySelector("#simulate-timeout-btn")?.click();
+    await simulateTimeout();
     return;
   }
   await window.Api.stopServer();
@@ -3361,6 +3385,14 @@ function wireEvents() {
       appState.pagination.packets = 1;
       renderProtocol();
     });
+  });
+  // 协议时序：flow 选择器
+  byId("sequence-flow-select")?.addEventListener("change", (event) => {
+    const value = event.currentTarget.value || "";
+    // 空串代表"自动（最近一次）"——清掉显式选择，让 currentSequenceFlowId() 回退到 currentFlowId
+    appState.selectedFlowId = value || null;
+    appState.currentFlowId = value || appState.currentFlowId;
+    renderProtocol();
   });
   // 清空包过滤：把 5 个 select 复位、重置 appState、回第一页、重渲染
   const packetClear = byId("packet-filter-clear");
@@ -3634,103 +3666,105 @@ function wireEvents() {
     }
     await refreshLogs();
   });
+}
 
-  byId("simulate-wrong-btn").addEventListener("click", async () => {
-    appState.selectedScenario = "auth-failure";
-    syncProtocolSelectors();
-    const serverForm = formObject(byId("server-form"));
-    const clientForm = formObject(byId("client-form"));
-    setNotice("");
-    setTestRows([{id: "auth_failed", pass: null}], "auth_failed");
-    // 不调用 /api/reset：保留已有日志；只停止可能在跑的子进程
-    await window.Api.stopServer();
-    await window.Api.stopClient();
-    setTestRows([{id: "auth_failed", pass: null}], "auth_failed");
-    beginSimulationFlow();
-    await refreshStatus();
-    const startedAt = Date.now();
-    const fallbackIndex = null;
-    resetInteractiveAttemptState();
-    const serverResult = await window.Api.startServer({
-      ...serverForm,
-      protocol: appState.selectedProtocol,
-      scenario: appState.selectedScenario,
-    });
-    if (serverResult.ok === false) {
-      setTestRows([{id: "auth_failed", pass: false}], "auth_failed");
-      setNotice(localizeError(serverResult.error || t("serverStartFailed")));
-      return;
-    }
-    await sleep(350);
-    const clientResult = await window.Api.startClient({
-      host: clientForm.host,
-      port: serverForm.port,
-      outputFile: "output/wrong-auth.bin",
-      protocol: appState.selectedProtocol,
-      scenario: appState.selectedScenario,
-      mode: "compat",
-      pwd1: "wrong-one",
-      pwd2: "wrong-two",
-      pwd3: "wrong-three",
-    });
-    if (clientResult.ok === false) {
-      setTestRows([{id: "auth_failed", pass: false}], "auth_failed");
-      setNotice(localizeError(clientResult.error || t("clientStartFailed")));
-      return;
-    }
-    const passed = await waitForSimulationResult(startedAt, fallbackIndex, (recent) => {
-      const hasThirdFailure = recent.some((entry) => entry.event === "AUTH_FAIL" && Number(entry.attempt || 0) >= 3);
-      const hasRejectOrAbort = recent.some((entry) =>
-        entry.packet_type === "REJECT" ||
-        entry.event === "FINAL_ABORT" ||
-        /three password|authentication failure|password rejected/i.test(`${entry.message || ""} ${entry.error_code || ""}`)
-      );
-      return hasThirdFailure || hasRejectOrAbort;
-    });
-    setTestRows([{id: "auth_failed", pass: passed}], "auth_failed");
-    if (passed) setNotice("");
+/* 原"模拟认证失败"按钮逻辑：从协议与场景下拉选择 auth-failure 时也会复用 */
+async function simulateAuthFailure() {
+  appState.selectedScenario = "auth-failure";
+  syncProtocolSelectors();
+  const serverForm = formObject(byId("server-form"));
+  const clientForm = formObject(byId("client-form"));
+  setNotice("");
+  setTestRows([{id: "auth_failed", pass: null}], "auth_failed");
+  // 不调用 /api/reset：保留已有日志；只停止可能在跑的子进程
+  await window.Api.stopServer();
+  await window.Api.stopClient();
+  setTestRows([{id: "auth_failed", pass: null}], "auth_failed");
+  beginSimulationFlow();
+  await refreshStatus();
+  const startedAt = Date.now();
+  const fallbackIndex = null;
+  resetInteractiveAttemptState();
+  const serverResult = await window.Api.startServer({
+    ...serverForm,
+    protocol: appState.selectedProtocol,
+    scenario: appState.selectedScenario,
   });
+  if (serverResult.ok === false) {
+    setTestRows([{id: "auth_failed", pass: false}], "auth_failed");
+    setNotice(localizeError(serverResult.error || t("serverStartFailed")));
+    return;
+  }
+  await sleep(350);
+  const clientResult = await window.Api.startClient({
+    host: clientForm.host,
+    port: serverForm.port,
+    outputFile: "output/wrong-auth.bin",
+    protocol: appState.selectedProtocol,
+    scenario: appState.selectedScenario,
+    mode: "compat",
+    pwd1: "wrong-one",
+    pwd2: "wrong-two",
+    pwd3: "wrong-three",
+  });
+  if (clientResult.ok === false) {
+    setTestRows([{id: "auth_failed", pass: false}], "auth_failed");
+    setNotice(localizeError(clientResult.error || t("clientStartFailed")));
+    return;
+  }
+  const passed = await waitForSimulationResult(startedAt, fallbackIndex, (recent) => {
+    const hasThirdFailure = recent.some((entry) => entry.event === "AUTH_FAIL" && Number(entry.attempt || 0) >= 3);
+    const hasRejectOrAbort = recent.some((entry) =>
+      entry.packet_type === "REJECT" ||
+      entry.event === "FINAL_ABORT" ||
+      /three password|authentication failure|password rejected/i.test(`${entry.message || ""} ${entry.error_code || ""}`)
+    );
+    return hasThirdFailure || hasRejectOrAbort;
+  });
+  setTestRows([{id: "auth_failed", pass: passed}], "auth_failed");
+  if (passed) setNotice("");
+}
 
-  byId("simulate-timeout-btn").addEventListener("click", async () => {
-    appState.selectedScenario = "timeout";
-    syncProtocolSelectors();
-    const clientForm = formObject(byId("client-form"));
-    setNotice("");
-    setTestRows([{id: "timeout", pass: null}], "timeout");
-    // 不调用 /api/reset：保留已有日志；只停止可能在跑的子进程
-    await window.Api.stopServer();
-    await window.Api.stopClient();
-    setTestRows([{id: "timeout", pass: null}], "timeout");
-    beginSimulationFlow();
-    await refreshStatus();
-    const startedAt = Date.now();
-    const fallbackIndex = null;
-    resetInteractiveAttemptState();
-    const clientResult = await window.Api.startClient({
-      host: clientForm.host,
-      port: timeoutSimulationPort(clientForm.port),
-      outputFile: "output/timeout.bin",
-      protocol: appState.selectedProtocol,
-      scenario: appState.selectedScenario,
-      mode: "compat",
-      pwd1: "secret",
-      pwd2: "secret",
-      pwd3: "secret",
-    });
-    if (clientResult.ok === false) {
-      setTestRows([{id: "timeout", pass: false}], "timeout");
-      setNotice(localizeError(clientResult.error || t("clientStartFailed")));
-      return;
-    }
-    const passed = await waitForSimulationResult(startedAt, fallbackIndex, (recent) => {
-      return recent.some((entry) =>
-        entry.event === "TIMEOUT" ||
-        /timeout/i.test(`${entry.error_code || ""} ${entry.message || ""}`)
-      );
-    }, 15000);
-    setTestRows([{id: "timeout", pass: passed}], "timeout");
-    if (passed) setNotice("");
+/* 原"模拟超时"按钮逻辑：从协议与场景下拉选择 timeout 时也会复用 */
+async function simulateTimeout() {
+  appState.selectedScenario = "timeout";
+  syncProtocolSelectors();
+  const clientForm = formObject(byId("client-form"));
+  setNotice("");
+  setTestRows([{id: "timeout", pass: null}], "timeout");
+  // 不调用 /api/reset：保留已有日志；只停止可能在跑的子进程
+  await window.Api.stopServer();
+  await window.Api.stopClient();
+  setTestRows([{id: "timeout", pass: null}], "timeout");
+  beginSimulationFlow();
+  await refreshStatus();
+  const startedAt = Date.now();
+  const fallbackIndex = null;
+  resetInteractiveAttemptState();
+  const clientResult = await window.Api.startClient({
+    host: clientForm.host,
+    port: timeoutSimulationPort(clientForm.port),
+    outputFile: "output/timeout.bin",
+    protocol: appState.selectedProtocol,
+    scenario: appState.selectedScenario,
+    mode: "compat",
+    pwd1: "secret",
+    pwd2: "secret",
+    pwd3: "secret",
   });
+  if (clientResult.ok === false) {
+    setTestRows([{id: "timeout", pass: false}], "timeout");
+    setNotice(localizeError(clientResult.error || t("clientStartFailed")));
+    return;
+  }
+  const passed = await waitForSimulationResult(startedAt, fallbackIndex, (recent) => {
+    return recent.some((entry) =>
+      entry.event === "TIMEOUT" ||
+      /timeout/i.test(`${entry.error_code || ""} ${entry.message || ""}`)
+    );
+  }, 15000);
+  setTestRows([{id: "timeout", pass: passed}], "timeout");
+  if (passed) setNotice("");
 }
 
 async function boot() {
