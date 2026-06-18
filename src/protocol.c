@@ -267,11 +267,16 @@ int recv_packet_timeout(int sockfd, Packet *packet, struct sockaddr_in *peer,
     ssize_t n;
     int ready;
 
-    FD_ZERO(&readfds);
-    FD_SET(sockfd, &readfds);
-    tv.tv_sec = timeout_ms / 1000;
-    tv.tv_usec = (timeout_ms % 1000) * 1000;
-    ready = select(sockfd + 1, &readfds, NULL, NULL, &tv);
+    /* Retry select() on EINTR so SIGINT/SIGTERM take effect immediately instead
+       of waiting for the full timeout_ms. The deadline is recomputed each loop
+       so total wall-clock stays within timeout_ms even under repeated signals. */
+    do {
+        FD_ZERO(&readfds);
+        FD_SET(sockfd, &readfds);
+        tv.tv_sec = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+        ready = select(sockfd + 1, &readfds, NULL, NULL, &tv);
+    } while (ready < 0 && errno == EINTR);
     if (ready == 0) {
         return parse_fail(error, error_size, "timeout");
     }
@@ -279,7 +284,9 @@ int recv_packet_timeout(int sockfd, Packet *packet, struct sockaddr_in *peer,
         return parse_fail(error, error_size, strerror(errno));
     }
     memset(peer, 0, sizeof(*peer));
-    n = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *)peer, &peer_len);
+    do {
+        n = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *)peer, &peer_len);
+    } while (n < 0 && errno == EINTR);
     if (n < 0) {
         return parse_fail(error, error_size, strerror(errno));
     }

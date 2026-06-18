@@ -1081,10 +1081,33 @@ function peerPort(peer) {
 
 // 生成新的 Flow ID：每次 server/client/test 启动都生成一个独立 flow
 // 一次传输尝试 = 一次 flow；成功 / 失败 / 超时 / 认证失败都共享同一个 flow
+//
+// Prefix includes the current backend session_id so that reloading the page
+// (which resets appState.flowCounter to 0) cannot collide with flow IDs
+// already present in logs/server.jsonl from earlier sessions.
 function generateFlowId(prefix = "flow", entry) {
   appState.flowCounter += 1;
   const port = (entry && (entry.port || peerPort(entry.peer))) || (appState.status.server?.port || appState.status.client?.port) || "udp";
-  return `${prefix}-${appState.flowCounter.toString().padStart(4, "0")}-${port}`;
+  const session = (appState.status.experiment && appState.status.experiment.session_id) || "pre";
+  return `${prefix}-${session}-${appState.flowCounter.toString().padStart(4, "0")}-${port}`;
+}
+
+/* After loading logs from the backend, scan for any pre-existing flow IDs of
+   the shape we generate so the next counter increment doesn't reuse a number.
+   Returns the highest existing counter value (0 if none). */
+function maxExistingFlowCounter(logs) {
+  let maxN = 0;
+  const re = /-(\d{4,})-[a-z]+$/i;
+  for (const entry of logs || []) {
+    const fid = entry && entry.flow_id;
+    if (typeof fid !== "string") continue;
+    const m = fid.match(re);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n) && n > maxN) maxN = n;
+    }
+  }
+  return maxN;
 }
 
 // 用户主动启动 server 时调用：
@@ -1190,10 +1213,8 @@ function ensureFlowIds() {
     appState.currentFlowId = appState.selectedFlowId;
   }
 
-  // 同步 lastFlowResult
-  if (lastEventFinal && lastEventFinal.flow_id === appState.currentFlowId) {
-    appState.lastFlowResult = lastEventFinal.result || (lastEventFinal.event === "FINAL_OK" ? "OK" : "ABORT");
-  }
+  // lastFlowResult is now derived by deriveRun() and applied by render()
+  // (single source of truth — no double writes here).
 }
 
 function findLatestClientFlowForPort(port) {
@@ -1225,6 +1246,7 @@ function mergeLogs(entries) {
   appState.allPackets = appState.logs.filter((entry) => entry.packet_type);
   // realPackets: 基于后端 packet_uid 去重后的真实包；同一 wire 包仅出现一次
   appState.realPackets = buildRealPackets(appState.allPackets);
+  rebuildRealPacketsIndex();
   // packets: 保留兼容旧引用；按 currentFlowId 过滤
   appState.packets = appState.currentFlowId
     ? appState.allPackets.filter((entry) => entry.flow_id === appState.currentFlowId)
@@ -1262,6 +1284,17 @@ function buildRealPackets(allPackets) {
   });
 }
 
+/* O(1) lookup table mapping realPackets entry -> index. Populated alongside
+   `appState.realPackets` whenever buildRealPackets() runs. Replaces two
+   `realPackets.indexOf(entry)` calls inside the render hot path that
+   contributed O(n²) per render. */
+function rebuildRealPacketsIndex() {
+  appState.realPacketsIndex = new Map();
+  for (let i = 0; i < appState.realPackets.length; i += 1) {
+    appState.realPacketsIndex.set(appState.realPackets[i], i);
+  }
+}
+
 function latest(predicate) {
   for (let i = appState.logs.length - 1; i >= 0; i -= 1) {
     if (predicate(appState.logs[i])) return appState.logs[i];
@@ -1291,10 +1324,9 @@ function deriveRun() {
   let result = finalEvent?.result || "Pending";
   // 当最近一次 flow 已经走到 FINAL_OK/FINAL_ABORT，重置时如果 appState 被清空，应当显示初始态
   if (!flowId) result = "Pending";
-  // 同步到 lastFlowResult，供控制台运行状态使用
-  if (finalEvent && finalEvent.flow_id === flowId) {
-    appState.lastFlowResult = finalEvent.result || (finalEvent.event === "FINAL_OK" ? "OK" : "ABORT");
-  }
+  const lastFlowResult = (finalEvent && finalEvent.flow_id === flowId)
+    ? (finalEvent.result || (finalEvent.event === "FINAL_OK" ? "OK" : "ABORT"))
+    : null;
   const serverDigest = flowLatest((entry) => entry.event === "SERVER_DIGEST" && entry.sha1);
   const clientDigest = flowLatest((entry) => (entry.event === "DIGEST_MATCH" || entry.event === "DIGEST_MISMATCH") && entry.sha1);
   const protocolId = flowLatest((entry) => entry.protocol)?.protocol
@@ -1307,7 +1339,6 @@ function deriveRun() {
   const inputStart = flowLatest((entry) => entry.event === "SERVER_START");
   const flowMeta = flowLatest((entry) => entry.protocol || entry.transport || entry.session_id || entry.scenario);
   const phase = deriveFlowPhase(flowLogs, flowPackets, protocolId, result);
-  appState.lastFlowPhase = phase;
   const ackCount = flowLogs.filter((entry) => entry.packet_type === "ACK").length;
   const nackCount = flowLogs.filter((entry) => entry.packet_type === "NACK").length;
   const retransmits = flowLogs.filter((entry) =>
@@ -1333,6 +1364,7 @@ function deriveRun() {
   return {
     result,
     phase,
+    lastFlowResult,
     attempts,
     serverDigest: serverDigest?.sha1 || "",
     clientDigest: clientDigest?.sha1 || "",
@@ -2264,7 +2296,7 @@ function renderProtocol() {
     const toServer = direction === "Client -> Server";
     const toClient = direction === "Server -> Client";
     // 共享数据源：realPackets（已去重），点击时序列与列表都用同一索引
-    const packetIndex = appState.realPackets.indexOf(entry);
+    const packetIndex = (appState.realPacketsIndex && appState.realPacketsIndex.get(entry)) ?? -1;
     const selected = entry === highlightedPacket ? "is-selected" : "";
     const status = packetStatus(entry);
     const messageName = `${entry.packet_type}${entry.packet_id !== undefined ? ` #${entry.packet_id}` : ""}`;
@@ -2282,7 +2314,7 @@ function renderProtocol() {
   }).join("") || `<p class="inspector-empty">${t("noPackets")}</p>`;
 
   byId("packet-table-body").innerHTML = packetPage.rows.map(({item: entry}) => {
-    const sourceIndex = appState.realPackets.indexOf(entry);
+    const sourceIndex = (appState.realPacketsIndex && appState.realPacketsIndex.get(entry)) ?? -1;
     const identifier = packetIdentifier(entry);
     const directionText = packetDirectionText(entry);
     const packetCode = packetCodes[entry.packet_type] || entry.packet_code || 0;
@@ -3100,6 +3132,12 @@ function renderTests() {
 
 function render() {
   const run = deriveRun();
+  /* Lift derived values from the run into appState here (single owner) so
+     deriveRun() itself stays pure — no hidden side effects on read. */
+  if (run.lastFlowResult) {
+    appState.lastFlowResult = run.lastFlowResult;
+  }
+  appState.lastFlowPhase = run.phase || "INIT";
   updateTopbar(run);
   renderDashboard(run);
   renderProtocolSummaryCard(run);
@@ -3109,8 +3147,6 @@ function render() {
   renderTransfer(run);
   renderLogs();
   renderTests();
-  // 暴露给 theme-manager.js
-  window.render = render;
   /* 主动隐藏 tooltip（render 整体刷新后位置会失效） */
   hideFragmentTooltip();
 }
@@ -3152,13 +3188,15 @@ async function refreshPackets() {
         ensureFlowIds();
         appState.allPackets = appState.logs.filter((entry) => entry.packet_type);
         appState.realPackets = buildRealPackets(appState.allPackets);
+        rebuildRealPacketsIndex();
         appState.packets = appState.currentFlowId
           ? appState.allPackets.filter((entry) => entry.flow_id === appState.currentFlowId)
           : appState.allPackets;
       }
     }
   } catch (err) {
-    // 静默：仍由 /api/logs 路径兜底
+    console.warn("refreshPackets failed:", err);
+    appState.notice = "无法获取包列表：后端 /api/packets 返回异常";
   }
 }
 
@@ -3351,9 +3389,11 @@ function wireEvents() {
     });
   });
   byId("refresh-logs-btn").addEventListener("click", refreshLogs);
-  byId("view-full-logs-btn").addEventListener("click", () => {
+  byId("view-full-logs-btn").addEventListener("click", (event) => {
+    event.preventDefault();
     document.querySelector("[data-tab='logs']").click();
-    byId("full-log-list").scrollIntoView({behavior: "smooth", block: "start"});
+    /* Scroll to the logs panel header instead of the (nonexistent) anchor. */
+    byId("full-log-tbody").scrollIntoView({behavior: "smooth", block: "start"});
   });
   // 日志过滤：role / level / event / 时间段 / 排序 / error-only
   ["role-filter", "level-filter", "log-event-filter", "log-sort"].forEach((id) => {
@@ -3815,6 +3855,9 @@ async function boot() {
   syncPasswordMode();
   await refreshStatus();
   await refreshLogs();
+  /* After the first log load, advance the flow counter past anything already
+     present so refreshes don't regenerate the same flow IDs. */
+  appState.flowCounter = Math.max(appState.flowCounter, maxExistingFlowCounter(appState.logs));
   connectWebSocket();
   setInterval(refreshStatus, 2500);
   setInterval(refreshLogs, 6000);

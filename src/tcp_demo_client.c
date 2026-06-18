@@ -303,6 +303,21 @@ int main(int argc, char **argv) {
         }
         demo_hmac_sha1(session_key, sizeof(session_key),
                        (const uint8_t *)"server-finished", strlen("server-finished"), finished);
+        /* Educational TLS-like demo: no PKI, no certificate, no Diffie-Hellman.
+           Anyone who knows the password can MITM. Emit a WARN-level log entry so
+           the frontend surfaces the limitation rather than letting students
+           assume the channel is authenticated. */
+        {
+            LogEvent warn;
+            demo_init_event(&warn, "WARN", "TLS_NO_SERVER_AUTH", "HANDSHAKE",
+                            "tls-like demo: no server authentication, MITM possible");
+            warn.peer = peer_text;
+            warn.security_encrypted = 1;
+            warn.security_mac_valid = 1;
+            warn.security_replay = 0;
+            warn.handshake_phase = "post-finished";
+            logger_write(&logger, &warn);
+        }
         if (memcmp(frame.payload, finished, sizeof(finished)) != 0) {
             LogEvent e;
             demo_init_event(&e, "ERROR", "FINISHED_VERIFY_FAIL", "HANDSHAKE", "server FINISHED invalid");

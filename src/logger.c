@@ -190,7 +190,13 @@ void compute_packet_uid(char *out, size_t out_size, uint16_t packet_type,
            所以 uid 一致；不同密码会得到不同 uid。 */
         sha1_update(&ctx, wire, wire_len);
     } else {
-        size_t take = wire_len < 8 ? wire_len : 8;
+        /* Widened from 8 to 32 bytes: with only 8 bytes (the protocol header +
+           2 leading payload bytes), two DATA packets that share the first
+           2 payload bytes (very common for ASCII transfers) collide. 32 bytes
+           covers header + first 22 payload bytes, which is enough to distinguish
+           typical chunks. Capped at the actual wire length so short frames still
+           produce a stable UID. */
+        size_t take = wire_len < 32 ? wire_len : 32;
         if (take > 0 && wire) {
             sha1_update(&ctx, wire, take);
         } else if (attempt > 0) {

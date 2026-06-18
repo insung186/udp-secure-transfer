@@ -22,6 +22,35 @@ body {
   transition: background-color 360ms ease, color 360ms ease;
 }
 
+/* -----------------------------------------------------------------------------
+   Design tokens — 所有字号 / 间距 / 控件尺寸都从 token 走，禁止散落魔法数。
+   chroma-atlas 节奏：caption < body < button ≈ control < display < hero。
+   主题层（themes.css）只管色板，结构层（这里）只管节奏。
+   ----------------------------------------------------------------------------- */
+:root {
+  /* 类型节奏 */
+  --fs-caption: 0.72rem;   /* hint / sub-text / 分隔符标签 */
+  --fs-body: 0.86rem;      /* 表单标签 / 表格 / 普通文本 */
+  --fs-button: 0.84rem;    /* 按钮 / chip */
+  --fs-control: 0.86rem;   /* 输入框 / select 内容 */
+  --fs-display: 1.06rem;   /* panel-head h2 / 状态标题 */
+  --fs-hero: 1.5rem;       /* 顶部数字 / 概览标题 */
+  --fs-mono: 0.78rem;      /* 包 UID / 十六进制预览 */
+
+  /* 控件节奏 */
+  --btn-min-height: 40px;
+  --btn-pad-x: 14px;
+  --btn-gap: 8px;
+  --btn-font-weight: 600;
+  --btn-radius: var(--button-radius, var(--control-radius));
+
+  --control-min-height: 36px;
+  --control-pad-x: 12px;
+
+  --card-pad: 14px;
+  --section-gap: 14px;
+}
+
 /* 主题装饰层在 body 之下、app-shell 之下 */
 .app-shell {
   position: relative;
@@ -52,7 +81,7 @@ h1 {
 }
 
 h2 {
-  font-size: 1rem;
+  font-size: var(--fs-display);
   line-height: 1.25;
   letter-spacing: 0;
   text-wrap: balance;
@@ -66,7 +95,7 @@ h3 {
 .caption,
 .hint {
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: var(--fs-caption);
   letter-spacing: 0;
 }
 
@@ -1724,6 +1753,12 @@ input[type="datetime-local"]:hover:not(:focus) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* 当 .button-row 只有 1 个按钮（运行场景、重置实验等），
+   让它独占整行——与 .test-action-grid 的 full-span 按钮保持像素级一致。 */
+.sidebar-form .button-row > button:only-child {
+  grid-column: 1 / -1;
+}
+
 .sidebar-form .button-row > button {
   width: 100%;
   min-width: 0;
@@ -1778,25 +1813,31 @@ input[type="datetime-local"]:hover:not(:focus) {
   line-height: 1.45;
 }
 
-/* 单元格内按钮：统一样式——撑满单元格、文本强制单行、明确中性背景，避免主题里 danger/warning 混入 */
+/* 单元格内按钮：与全局 button token 对齐——撑满单元格、文本单行、明确视觉权重，
+   避免主题里 danger/warning 混入。「重置实验」与「运行测试」像素级等高等宽。 */
 .run-test-cell .run-test-action {
   width: 100%;
-  min-height: 40px;
+  min-height: var(--btn-min-height);
   white-space: nowrap;
-  padding: 8px 10px;
-  font-size: 0.82rem;
-  gap: 6px;
+  padding: 0 var(--btn-pad-x);
+  font-size: var(--fs-button);
+  gap: var(--btn-gap);
   justify-content: center;
-  font-weight: 600;
-  background: var(--surface);
-  color: var(--ink);
-  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
+  align-items: center;
+  font-weight: var(--btn-font-weight);
+  border-radius: var(--btn-radius);
 }
 
 .run-test-cell .run-test-action.primary-button {
   color: var(--text-on-primary, #fff);
   background: var(--primary);
   border-color: var(--primary);
+}
+
+.run-test-cell .run-test-action.ghost-button {
+  background: var(--surface);
+  color: var(--ink);
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
 }
 
 .run-test-cell .shape-icon {
@@ -1810,21 +1851,26 @@ input[type="datetime-local"]:hover:not(:focus) {
 
 /* -----------------------------------------------------------------------------
    按钮
+   视觉权重：primary > danger > ghost > icon-button / pager-button
+   所有按钮走 --btn-* token（min-height / pad-x / gap / 字号 / 圆角）保持一致。
    ----------------------------------------------------------------------------- */
 .primary-button,
 .danger-button,
 .ghost-button,
 .icon-button,
 .pager-button {
-  min-height: 40px;
+  min-height: var(--btn-min-height);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 0 13px;
-  border-radius: var(--button-radius, var(--control-radius));
+  gap: var(--btn-gap);
+  padding: 0 var(--btn-pad-x);
+  border-radius: var(--btn-radius);
   border: var(--border-width, 1px) var(--border-style, solid) transparent;
   font-family: inherit;
+  font-size: var(--fs-button);
+  font-weight: var(--btn-font-weight);
+  letter-spacing: 0;
   transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 

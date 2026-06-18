@@ -48,6 +48,11 @@ int demo_send_frame(int fd, uint16_t type, const uint8_t *payload, uint32_t leng
 int demo_recv_frame(int fd, DemoFrame *frame);
 const char *demo_packet_type_name(uint16_t type);
 int demo_read_password(int interactive, char **passwords, int index, char *buf, size_t size);
+/* Read one password attempt into `buf`. When `stdin_fd >= 0`, reads from that fd
+   (interactive mode driven by control_server's pipe); otherwise falls back to
+   stdin (legacy CLI usage). Used by HTTP / WS / QUIC clients to fix the dead
+   `(void)interactive;` paths that ignored the interactive flag. */
+int demo_prompt_interactive_password(int stdin_fd, int index, char *buf, size_t size);
 void demo_hmac_sha1(const uint8_t *key, size_t key_len, const uint8_t *data, size_t data_len,
                     uint8_t out[SHA1_DIGEST_LENGTH]);
 void demo_xor_crypt(uint8_t *data, size_t len, const uint8_t *key, size_t key_len);

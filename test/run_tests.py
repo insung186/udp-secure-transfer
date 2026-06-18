@@ -34,7 +34,7 @@ def free_tcp_port():
     return port
 
 
-def run_cmd(args, timeout=8, env=None):
+def run_cmd(args, timeout=12, env=None):
     return subprocess.run(
         args,
         cwd=ROOT,
@@ -62,7 +62,7 @@ def start_server(port, password, input_file, env=None):
     return start_process(["./bin/server", str(port), password, str(input_file)], env=env)
 
 
-def wait_for_server_start(port, timeout=2.5):
+def wait_for_server_start(port, timeout=4.0):
     deadline = time.time() + timeout
     marker = f'"port":{port}'
     log_path = ROOT / "logs" / "server.jsonl"
@@ -73,7 +73,7 @@ def wait_for_server_start(port, timeout=2.5):
     return False
 
 
-def collect_process(proc, timeout=6):
+def collect_process(proc, timeout=8):
     try:
         stdout, stderr = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:

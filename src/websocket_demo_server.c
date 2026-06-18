@@ -23,10 +23,16 @@ static void handle_signal(int signo) {
     stop_requested = 1;
 }
 
-static const char *find_header_value(const char *raw, const char *key) {
-    static char value[256];
+/* Finds an HTTP header value. Writes up to (cap-1) bytes plus a NUL terminator
+   into `out`. Returns 0 on hit, -1 on miss or overflow. Re-entrant: caller-owned
+   buffer (previously a static buffer, which broke concurrent callers). */
+static int find_header_value(const char *raw, const char *key, char *out, size_t cap) {
     const char *p = raw;
     size_t key_len = strlen(key);
+    if (!out || cap == 0) {
+        return -1;
+    }
+    out[0] = '\0';
     while ((p = strstr(p, key)) != NULL) {
         if (p == raw || *(p - 1) == '\n') {
             const char *start = p + key_len;
@@ -36,14 +42,18 @@ static const char *find_header_value(const char *raw, const char *key) {
             }
             end = strstr(start, "\r\n");
             if (!end) {
-                return NULL;
+                return -1;
             }
-            snprintf(value, sizeof(value), "%.*s", (int)(end - start), start);
-            return value;
+            if ((size_t)(end - start) >= cap) {
+                return -1;
+            }
+            memcpy(out, start, (size_t)(end - start));
+            out[end - start] = '\0';
+            return 0;
         }
         p += key_len;
     }
-    return NULL;
+    return -1;
 }
 
 static int read_http_request(int fd, uint8_t *buf, size_t cap, size_t *out_len) {
@@ -113,49 +123,68 @@ static int send_frame(Logger *logger, int fd, const char *peer, uint8_t opcode,
 static int recv_frame(Logger *logger, int fd, const char *peer, uint8_t *opcode,
                       uint8_t *payload, size_t *payload_len, const char *state) {
     uint8_t header[2];
+    uint8_t ext[2];
     uint8_t mask[4];
-    uint8_t wire[2 + 4 + WS_MAX_PAYLOAD];
+    uint8_t wire[2 + 2 + 4 + WS_MAX_PAYLOAD];
+    uint64_t pl = 0;
     size_t i;
     if (demo_read_all(fd, header, sizeof(header)) != 0) {
         return -1;
     }
     *opcode = header[0] & 0x0fU;
-    *payload_len = header[1] & 0x7fU;
-    if (*payload_len > WS_MAX_PAYLOAD) {
+    /* Decode payload length per RFC 6455 §5.2:
+         < 126  -> 7 bits inline
+         = 126  -> next 2 bytes (16-bit, network order)
+         = 127  -> next 8 bytes (64-bit) — rejected here because we cap payload. */
+    if ((header[1] & 0x7fU) < 126) {
+        pl = header[1] & 0x7fU;
+    } else if ((header[1] & 0x7fU) == 126) {
+        if (demo_read_all(fd, ext, sizeof(ext)) != 0) {
+            return -1;
+        }
+        pl = ((uint32_t)ext[0] << 8) | ext[1];
+    } else {
+        /* 64-bit length: we never send payloads > WS_MAX_PAYLOAD, so refuse. */
         return -1;
     }
+    if (pl > WS_MAX_PAYLOAD) {
+        return -1;
+    }
+    *payload_len = (size_t)pl;
     wire[0] = header[0];
     wire[1] = header[1];
+    size_t wire_used = 2;
+    if ((header[1] & 0x7fU) == 126) {
+        wire[wire_used++] = ext[0];
+        wire[wire_used++] = ext[1];
+    }
     if (header[1] & 0x80U) {
         if (demo_read_all(fd, mask, sizeof(mask)) != 0) {
             return -1;
         }
-        memcpy(wire + 2, mask, sizeof(mask));
+        memcpy(wire + wire_used, mask, sizeof(mask));
+        wire_used += sizeof(mask);
         if (*payload_len > 0 && demo_read_all(fd, payload, *payload_len) != 0) {
             return -1;
         }
-        memcpy(wire + 6, payload, *payload_len);
+        memcpy(wire + wire_used, payload, *payload_len);
         for (i = 0; i < *payload_len; i += 1) {
             payload[i] ^= mask[i % 4];
         }
-        log_ws_packet(logger, "INFO", "RECV_WS_FRAME", state, "websocket frame received",
-                      peer, "Client -> Server",
-                      *opcode == 0x1U ? "TEXT" : *opcode == 0x9U ? "PING" : *opcode == 0xAU ? "PONG" : "CLOSE",
-                      *opcode == 0x1U ? 42 : *opcode == 0x9U ? 43 : *opcode == 0xAU ? 44 : 45,
-                      *opcode == 0x1U ? "text" : *opcode == 0x9U ? "ping" : *opcode == 0xAU ? "pong" : "close",
-                      wire, 6 + *payload_len);
-        return 0;
+        wire_used += *payload_len;
+    } else {
+        if (*payload_len > 0 && demo_read_all(fd, payload, *payload_len) != 0) {
+            return -1;
+        }
+        memcpy(wire + wire_used, payload, *payload_len);
+        wire_used += *payload_len;
     }
-    if (*payload_len > 0 && demo_read_all(fd, payload, *payload_len) != 0) {
-        return -1;
-    }
-    memcpy(wire + 2, payload, *payload_len);
     log_ws_packet(logger, "INFO", "RECV_WS_FRAME", state, "websocket frame received",
                   peer, "Client -> Server",
                   *opcode == 0x1U ? "TEXT" : *opcode == 0x9U ? "PING" : *opcode == 0xAU ? "PONG" : "CLOSE",
                   *opcode == 0x1U ? 42 : *opcode == 0x9U ? 43 : *opcode == 0xAU ? 44 : 45,
                   *opcode == 0x1U ? "text" : *opcode == 0x9U ? "ping" : *opcode == 0xAU ? "pong" : "close",
-                  wire, 2 + *payload_len);
+                  wire, wire_used);
     return 0;
 }
 
@@ -189,7 +218,6 @@ int main(int argc, char **argv) {
     struct stat st;
     uint8_t raw[WS_HTTP_BUF + 1];
     size_t raw_len = 0;
-    const char *value;
     char key[256];
     char upgrade[64];
     char connection[64];
@@ -251,14 +279,18 @@ int main(int argc, char **argv) {
     }
     log_ws_packet(&logger, "INFO", "RECV_UPGRADE_REQUEST", "HANDSHAKE", "websocket upgrade request received",
                   peer, "Client -> Server", "UPGRADE_REQUEST", 40, "http-upgrade", raw, raw_len);
-    value = find_header_value((const char *)raw, "Sec-WebSocket-Key:");
-    snprintf(key, sizeof(key), "%s", value ? value : "");
-    value = find_header_value((const char *)raw, "Upgrade:");
-    snprintf(upgrade, sizeof(upgrade), "%s", value ? value : "");
-    value = find_header_value((const char *)raw, "Connection:");
-    snprintf(connection, sizeof(connection), "%s", value ? value : "");
-    value = find_header_value((const char *)raw, "X-Demo-Password:");
-    snprintf(header_password, sizeof(header_password), "%s", value ? value : "");
+    if (find_header_value((const char *)raw, "Sec-WebSocket-Key:", key, sizeof(key)) != 0) {
+        key[0] = '\0';
+    }
+    if (find_header_value((const char *)raw, "Upgrade:", upgrade, sizeof(upgrade)) != 0) {
+        upgrade[0] = '\0';
+    }
+    if (find_header_value((const char *)raw, "Connection:", connection, sizeof(connection)) != 0) {
+        connection[0] = '\0';
+    }
+    if (find_header_value((const char *)raw, "X-Demo-Password:", header_password, sizeof(header_password)) != 0) {
+        header_password[0] = '\0';
+    }
     if (!key[0] || !upgrade[0] || !connection[0] || strcmp(upgrade, "websocket") != 0 ||
         strstr(connection, "Upgrade") == NULL ||
         !header_password[0] || strcmp(header_password, password) != 0) {

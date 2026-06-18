@@ -149,6 +149,7 @@ static int run_tcp_basic(Logger *logger, int client_fd, const char *peer_text,
         if (connection_close_mid_transfer && chunks == 1) {
             fclose(fp);
             close(client_fd);
+            client_fd = -1;
             demo_finish(logger, "ABORT", "connection closed mid transfer");
             return 1;
         }
@@ -404,7 +405,10 @@ int main(int argc, char **argv) {
             demo_finish(&logger, "ABORT", "tls-like flow failed");
             rc = 1;
         }
-        close(client_fd);
+        if (client_fd >= 0) {
+            close(client_fd);
+            client_fd = -1;
+        }
         close(listener_fd);
         logger_close(&logger);
         return rc;
@@ -418,7 +422,10 @@ int main(int argc, char **argv) {
             demo_finish(&logger, "ABORT", "tcp-basic flow failed");
             rc = 1;
         }
-        close(client_fd);
+        if (client_fd >= 0) {
+            close(client_fd);
+            client_fd = -1;
+        }
         close(listener_fd);
         logger_close(&logger);
         return rc;

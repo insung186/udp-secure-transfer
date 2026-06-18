@@ -207,6 +207,7 @@ int main(int argc, char **argv) {
         logger_close(&logger);
         return 1;
     }
+    /* HTTP /auth only takes one attempt; the interactive flag is informational. */
     (void)interactive;
     if (parse_port(argv[2], &port) != 0) {
         demo_finish(&logger, "ABORT", "invalid port");

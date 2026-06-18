@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <time.h>
+#include <time.h>
 #include <unistd.h>
 
 static void put_u16(uint8_t *buf, uint16_t value) {
@@ -230,6 +231,48 @@ int demo_read_password(int interactive, char **passwords, int index, char *buf, 
     }
     trim_line(buf);
     return 0;
+}
+
+int demo_prompt_interactive_password(int stdin_fd, int index, char *buf, size_t size) {
+    if (size == 0) {
+        return -1;
+    }
+    buf[0] = '\0';
+    fprintf(stderr, "Password attempt %d: ", index + 1);
+    fflush(stderr);
+    if (stdin_fd >= 0) {
+        /* Read one line from the control_server's pipe. Non-blocking pipe writes
+           from the UI may arrive in chunks; loop until newline or EOF. */
+        size_t pos = 0;
+        while (pos + 1 < size) {
+            char c;
+            ssize_t n = read(stdin_fd, &c, 1);
+            if (n == 0) {
+                break;
+            }
+            if (n < 0) {
+                if (errno == EINTR) continue;
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    struct timespec pause = {0, 50000000L};
+                    nanosleep(&pause, NULL);
+                    continue;
+                }
+                break;
+            }
+            if (c == '\n' || c == '\r') {
+                break;
+            }
+            buf[pos++] = c;
+        }
+        buf[pos] = '\0';
+        return (int)pos;
+    }
+    /* Legacy CLI path. */
+    if (!fgets(buf, (int)size, stdin)) {
+        return -1;
+    }
+    trim_line(buf);
+    return (int)strlen(buf);
 }
 
 void demo_hmac_sha1(const uint8_t *key, size_t key_len, const uint8_t *data, size_t data_len,

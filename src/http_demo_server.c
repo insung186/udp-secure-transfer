@@ -21,6 +21,9 @@ static void handle_signal(int signo) {
     stop_requested = 1;
 }
 
+/* Forward declaration for the parser helper defined further below. */
+static long header_value_int(const char *match, const char *name);
+
 static int read_http_message(int fd, uint8_t *buf, size_t cap, size_t *out_len) {
     size_t total = 0;
     int header_end = -1;
@@ -57,7 +60,8 @@ static int read_http_message(int fd, uint8_t *buf, size_t cap, size_t *out_len) 
                     }
                 }
                 if (cl) {
-                    body_need = (size_t)strtoul(cl + 15, NULL, 10);
+                    long v = header_value_int(cl, "Content-Length:");
+                    body_need = (v > 0) ? (size_t)v : 0;
                 }
             }
         }
@@ -87,11 +91,31 @@ static const char *find_header_ci(const char *raw, const char *needle) {
     return NULL;
 }
 
+/* Parse the integer value of a header line whose substring match begins at `match`.
+   Skips whitespace and ':' to reach the numeric value. Robust to `Name: N`,
+   `Name:N`, and case differences. Returns -1 on parse failure. */
+static long header_value_int(const char *match, const char *name) {
+    const char *p = match + strlen(name);
+    while (*p == ':' || *p == ' ' || *p == '\t') {
+        p += 1;
+    }
+    if (!*p) {
+        return -1;
+    }
+    char *end = NULL;
+    long v = strtol(p, &end, 10);
+    if (end == p) {
+        return -1;
+    }
+    return v;
+}
+
 static void header_summary(const char *raw, char *out, size_t out_size) {
     const char *cl = find_header_ci(raw, "Content-Length:");
     const char *conn = find_header_ci(raw, "Connection:");
+    long cl_val = cl ? header_value_int(cl, "Content-Length:") : 0;
     snprintf(out, out_size, "Content-Length=%ld; Connection=%s",
-             cl ? strtol(cl + 15, NULL, 10) : 0L,
+             cl_val,
              conn ? "close" : "default");
 }
 
@@ -268,7 +292,7 @@ int main(int argc, char **argv) {
                 break;
             }
         } else if (strcmp(method, "POST") == 0 && strcmp(path, "/auth") == 0) {
-            if (body_len >= strlen(password) + 9 && strncmp(body, "password=", 9) == 0 &&
+            if (body_len == strlen(password) + 9 && strncmp(body, "password=", 9) == 0 &&
                 strncmp(body + 9, password, strlen(password)) == 0) {
                 authed = 1;
                 if (send_http_response(&logger, fd, peer, 200, "OK", "auth=accepted",

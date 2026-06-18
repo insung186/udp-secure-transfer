@@ -21,6 +21,7 @@
 
 #define CONTROL_PORT 8080
 #define HTTP_BUF 32768
+#define HTTP_MAX_BODY 65536  /* refuse requests claiming Content-Length > this */
 #define JSON_BUF 262144
 #define SMALL_BUF 512
 
@@ -55,6 +56,7 @@ typedef struct {
 typedef struct {
     ChildProc server;
     ChildProc client;
+    ChildProc test;       /* test runner — only one allowed at a time */
     ExperimentState experiment;
     int ws_fd;
     long server_log_offset;
@@ -247,6 +249,25 @@ static void set_nonblock(int fd) {
     }
 }
 
+/* Mark all file descriptors >= 3 with FD_CLOEXEC so a forked child cannot
+   accidentally hold the control_server's listening socket, WebSocket fd,
+   or any other sensitive fd past exec. Called in the child between fork()
+   and execv() — must not touch fd 0/1/2 (stdin/stdout/stderr). */
+static void set_cloexec_on_inherited_fds(void) {
+    int max = (int)sysconf(_SC_OPEN_MAX);
+    if (max < 0) {
+        max = 1024;
+    }
+    for (int fd = 3; fd < max; fd += 1) {
+        int flags = fcntl(fd, F_GETFD, 0);
+        if (flags < 0) {
+            /* fd not open: skip silently (EBADF / EINVAL etc.) */
+            continue;
+        }
+        fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+    }
+}
+
 static void child_init(ChildProc *proc, const char *name) {
     memset(proc, 0, sizeof(*proc));
     proc->pid = -1;
@@ -271,11 +292,27 @@ static void close_if_open(int *fd) {
 static void stop_child(ChildProc *proc) {
     if (child_running(proc)) {
         struct timespec pause_time;
+        pid_t waited;
+        /* Step 1: SIGTERM and give the child 2s to flush its JSONL logs and
+           terminate gracefully. 150ms (the prior value) was too short: the
+           server's last SHA1/FINISH log lines got truncated by the SIGKILL. */
         kill(proc->pid, SIGTERM);
         pause_time.tv_sec = 0;
-        pause_time.tv_nsec = 150000000L;
+        pause_time.tv_nsec = 200000000L;  /* initial probe */
         nanosleep(&pause_time, NULL);
-        if (waitpid(proc->pid, NULL, WNOHANG) == 0) {
+        waited = waitpid(proc->pid, NULL, WNOHANG);
+        if (waited == 0) {
+            /* Wait up to 2s total in 100ms slices. */
+            int waited_ms = 200;
+            while (waited == 0 && waited_ms < 2000) {
+                pause_time.tv_sec = 0;
+                pause_time.tv_nsec = 100000000L;
+                nanosleep(&pause_time, NULL);
+                waited_ms += 100;
+                waited = waitpid(proc->pid, NULL, WNOHANG);
+            }
+        }
+        if (waited == 0) {
             kill(proc->pid, SIGKILL);
         }
         waitpid(proc->pid, NULL, WNOHANG);
@@ -351,6 +388,9 @@ static int start_child(ChildProc *proc, char *const argv[], int with_stdin,
         close(err_pipe[1]);
         close_if_open(&in_pipe[0]);
         close_if_open(&in_pipe[1]);
+        /* Mark every inherited fd >= 3 with FD_CLOEXEC so the child cannot
+           reach the control_server's listening socket or open WebSocket. */
+        set_cloexec_on_inherited_fds();
         for (i = 0; i < env_count; i += 1) {
             if (envs[i].key && envs[i].value) {
                 setenv(envs[i].key, envs[i].value, 1);
@@ -712,7 +752,125 @@ static void append_log_array(char *json, size_t cap, const char *key, const char
    - 当前 logs 里出现的每个 uid：选 sender-side 行（role 与 direction 的 from 端匹配）
    - 当前 logs 里不存在的旧 uid：保留为 orphan（属于历史 flow）
    - role 字段在 packets.jsonl 里表示"该包的发送方角色"（client 或 server）
-   跨 run / 跨 flow 的最终去重交给前端的 buildRealPackets（key = flow_id + packet_uid）。*/
+   跨 run / 跨 flow 的最终去重交给前端的 buildRealPackets（key = flow_id + packet_uid）。
+
+   性能增量：
+   - state.packets_cache: uid → picked line (sender-side preference resolved)
+   - state.packets_server_offset / state.packets_client_offset:
+       per-log-file offsets that advance only as new lines arrive
+   - On every api_packets call: read NEW bytes from each log since the saved
+     offset, fold into cache, then rewrite packets.jsonl from cache + orphans.
+     Drops from O(N×M) full rescan to O(delta). */
+
+/* Index entry: uid maps to one of server_line / client_line depending on
+   direction preference, but we keep both so we can re-pick if the algorithm
+   changes. */
+typedef struct {
+    char uid[64];
+    char server_line[8192];
+    char client_line[8192];
+} PacketPair;
+
+static PacketPair *packets_cache = NULL;
+static size_t packets_cache_n = 0;
+static size_t packets_cache_cap = 0;
+static long packets_server_offset = 0;
+static long packets_client_offset = 0;
+
+static void packets_cache_put(const char *uid, int which, const char *line) {
+    size_t i;
+    for (i = 0; i < packets_cache_n; i += 1) {
+        if (strcmp(packets_cache[i].uid, uid) == 0) {
+            if (which == 0) {
+                snprintf(packets_cache[i].server_line, sizeof(packets_cache[i].server_line), "%s", line);
+            } else {
+                snprintf(packets_cache[i].client_line, sizeof(packets_cache[i].client_line), "%s", line);
+            }
+            return;
+        }
+    }
+    if (packets_cache_n >= packets_cache_cap) {
+        size_t new_cap = packets_cache_cap ? packets_cache_cap * 2 : 32;
+        PacketPair *next = realloc(packets_cache, new_cap * sizeof(PacketPair));
+        if (!next) return;
+        packets_cache = next;
+        packets_cache_cap = new_cap;
+    }
+    memset(&packets_cache[packets_cache_n], 0, sizeof(PacketPair));
+    snprintf(packets_cache[packets_cache_n].uid, sizeof(packets_cache[packets_cache_n].uid), "%s", uid);
+    if (which == 0) {
+        snprintf(packets_cache[packets_cache_n].server_line, sizeof(packets_cache[packets_cache_n].server_line), "%s", line);
+    } else {
+        snprintf(packets_cache[packets_cache_n].client_line, sizeof(packets_cache[packets_cache_n].client_line), "%s", line);
+    }
+    packets_cache_n += 1;
+}
+
+static void packets_cache_reset(void) {
+    free(packets_cache);
+    packets_cache = NULL;
+    packets_cache_n = 0;
+    packets_cache_cap = 0;
+    packets_server_offset = 0;
+    packets_client_offset = 0;
+}
+
+/* Forward declarations for helpers defined further down in this file.
+   Needed because packets_scan_log (above the existing api_packets) uses them. */
+static int is_packet_log_line(const char *line);
+static void line_uid_key(const char *line, char *out, size_t out_size);
+static void line_direction(const char *line, char *out, size_t out_size);
+
+/* Read newly-appended lines from one log file, fold packet events into the
+   cache. Returns the new EOF offset. */
+static long packets_scan_log(const char *path, int which, long start_offset) {
+    FILE *fp = fopen(path, "r");
+    char line[8192];
+    long new_offset;
+    if (!fp) {
+        return start_offset;
+    }
+    /* External truncation detection — same trick as push_log_tail. */
+    if (start_offset > 0) {
+        struct stat st;
+        if (fstat(fileno(fp), &st) == 0 && st.st_size < start_offset) {
+            start_offset = 0;
+        }
+    }
+    fseek(fp, start_offset, SEEK_SET);
+    while (fgets(line, sizeof(line), fp)) {
+        size_t len = strlen(line);
+        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+            line[--len] = '\0';
+        }
+        if (!is_packet_log_line(line)) continue;
+        char uid[64];
+        line_uid_key(line, uid, sizeof(uid));
+        if (uid[0]) {
+            packets_cache_put(uid, which, line);
+        }
+    }
+    /* Partial-line guard: leave the offset at the start of any unterminated
+       last line so the next call re-reads the completed form. */
+    new_offset = ftell(fp);
+    if (new_offset > start_offset) {
+        if (fseek(fp, new_offset - 1, SEEK_SET) == 0) {
+            int c = fgetc(fp);
+            if (c != '\n' && c != EOF) {
+                long pos = new_offset - 1;
+                while (pos > start_offset) {
+                    if (fseek(fp, pos, SEEK_SET) != 0) break;
+                    c = fgetc(fp);
+                    if (c == '\n') { pos += 1; break; }
+                    pos -= 1;
+                }
+                new_offset = pos;
+            }
+        }
+    }
+    fclose(fp);
+    return new_offset;
+}
 
 static void append_packet_array(char *json, size_t cap, const char *path) {
     FILE *fp = fopen(path, "r");
@@ -740,6 +898,7 @@ static void truncate_packets(void) {
     FILE *fp = fopen("logs/packets.jsonl", "w");
     if (fp) fclose(fp);
     state.packets_log_offset = 0;
+    packets_cache_reset();
 }
 
 /* 从一行日志中提取 packet_type；若非数据包事件则返回 0 */
@@ -791,62 +950,12 @@ static void api_packets(int fd) {
         send_http(fd, "500 Internal Server Error", "application/json", "{\"error\":\"oom\"}");
         return;
     }
-    /* packets.jsonl 维护策略：
-       每次请求都扫描 server.jsonl + client.jsonl，按 packet_uid 合并成 pair，
-       然后为每个 pair 选 sender-side 记录（role 与 direction 的 from 端匹配）。
-       最后把 packets.jsonl 整文件重写：
-         - 老记录里 uid 在当前 logs 中仍有 → 替换为新算法选出的 sender-side 行
-         - 老记录里 uid 在当前 logs 中已无（orphan from old runs）→ 保留
-       这样算法一旦更新（比如 sender-side 选择变了），旧记录会被自动替换；
-       而属于"历史 flow 但当前没在 logs"的记录不会丢失。 */
-    typedef struct {
-        char uid[64];
-        char server_line[8192];
-        char client_line[8192];
-    } PacketPair;
-    PacketPair *pairs = NULL;
-    size_t pairs_n = 0;
-    size_t pairs_cap = 0;
-    const char *log_paths[] = {"logs/server.jsonl", "logs/client.jsonl"};
-    for (size_t li = 0; li < sizeof(log_paths) / sizeof(log_paths[0]); li++) {
-        FILE *lfp = fopen(log_paths[li], "r");
-        if (!lfp) continue;
-        char line[8192];
-        while (fgets(line, sizeof(line), lfp)) {
-            if (!is_packet_log_line(line)) continue;
-            size_t len = strlen(line);
-            while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
-                line[--len] = '\0';
-            }
-            char uid[64];
-            line_uid_key(line, uid, sizeof(uid));
-            if (!uid[0]) continue;
-            size_t idx = pairs_n;
-            for (size_t i = 0; i < pairs_n; i++) {
-                if (strcmp(pairs[i].uid, uid) == 0) { idx = i; break; }
-            }
-            if (idx == pairs_n) {
-                if (pairs_n >= pairs_cap) {
-                    size_t new_cap = pairs_cap ? pairs_cap * 2 : 32;
-                    PacketPair *new_arr = realloc(pairs, new_cap * sizeof(PacketPair));
-                    if (!new_arr) break;
-                    pairs = new_arr;
-                    pairs_cap = new_cap;
-                }
-                memset(&pairs[idx], 0, sizeof(PacketPair));
-                snprintf(pairs[idx].uid, sizeof(pairs[idx].uid), "%s", uid);
-                pairs_n++;
-            }
-            if (li == 0) {
-                snprintf(pairs[idx].server_line, sizeof(pairs[idx].server_line), "%s", line);
-            } else {
-                snprintf(pairs[idx].client_line, sizeof(pairs[idx].client_line), "%s", line);
-            }
-        }
-        fclose(lfp);
-    }
+    /* Step 1: incrementally fold new log bytes into packets_cache. */
+    packets_server_offset = packets_scan_log("logs/server.jsonl", 0, packets_server_offset);
+    packets_client_offset = packets_scan_log("logs/client.jsonl", 1, packets_client_offset);
 
-    /* 读取 packets.jsonl 已有的所有行（用于识别 orphan） */
+    /* Step 2: load existing orphans (packets.jsonl lines whose uid is no
+       longer present in either log) — keep them so historical flows survive. */
     typedef struct {
         char uid[64];
         char line[8192];
@@ -866,82 +975,71 @@ static void api_packets(int fd) {
             char uid[64];
             line_uid_key(line, uid, sizeof(uid));
             if (!uid[0]) continue;
+            /* If this uid is now in the cache, the cache entry supersedes it. */
+            int covered = 0;
+            for (size_t i = 0; i < packets_cache_n; i++) {
+                if (strcmp(packets_cache[i].uid, uid) == 0) { covered = 1; break; }
+            }
+            if (covered) continue;
             if (existing_lines_n >= existing_lines_cap) {
                 size_t new_cap = existing_lines_cap ? existing_lines_cap * 2 : 32;
-                ExistingLine *new_arr = realloc(existing_lines, new_cap * sizeof(ExistingLine));
-                if (!new_arr) break;
-                existing_lines = new_arr;
+                ExistingLine *next = realloc(existing_lines, new_cap * sizeof(ExistingLine));
+                if (!next) break;
+                existing_lines = next;
                 existing_lines_cap = new_cap;
             }
             snprintf(existing_lines[existing_lines_n].uid,
                      sizeof(existing_lines[existing_lines_n].uid), "%s", uid);
             snprintf(existing_lines[existing_lines_n].line,
                      sizeof(existing_lines[existing_lines_n].line), "%s", line);
-            existing_lines_n++;
+            existing_lines_n += 1;
         }
         fclose(rfp);
     }
 
-    /* 重写 packets.jsonl：先写 orphan（uid 不在当前 logs 的旧记录），再写每个 pair 的 sender-side */
+    /* Step 3: rewrite packets.jsonl from cache + orphans, picking the
+       sender-side line for each pair. */
     FILE *wfp = fopen("logs/packets.jsonl.tmp", "w");
+    size_t count = 0;
     if (wfp) {
         for (size_t i = 0; i < existing_lines_n; i++) {
-            int is_replaced = 0;
-            for (size_t j = 0; j < pairs_n; j++) {
-                if (strcmp(existing_lines[i].uid, pairs[j].uid) == 0) {
-                    is_replaced = 1;
-                    break;
-                }
-            }
-            if (!is_replaced) {
-                fputs(existing_lines[i].line, wfp);
-                fputc('\n', wfp);
-            }
+            fputs(existing_lines[i].line, wfp);
+            fputc('\n', wfp);
+            count += 1;
         }
-        for (size_t i = 0; i < pairs_n; i++) {
+        for (size_t i = 0; i < packets_cache_n; i++) {
             const char *picked = NULL;
-            int have_server = pairs[i].server_line[0] != '\0';
-            int have_client = pairs[i].client_line[0] != '\0';
+            int have_server = packets_cache[i].server_line[0] != '\0';
+            int have_client = packets_cache[i].client_line[0] != '\0';
             if (have_server && have_client) {
                 char dir[32] = "";
-                line_direction(pairs[i].server_line, dir, sizeof(dir));
+                line_direction(packets_cache[i].server_line, dir, sizeof(dir));
                 if (strcmp(dir, "Server -> Client") == 0) {
-                    picked = pairs[i].server_line;
+                    picked = packets_cache[i].server_line;
                 } else if (strcmp(dir, "Client -> Server") == 0) {
-                    picked = pairs[i].client_line;
+                    picked = packets_cache[i].client_line;
                 } else {
-                    picked = pairs[i].server_line;
+                    picked = packets_cache[i].server_line;
                 }
             } else if (have_server) {
-                picked = pairs[i].server_line;
+                picked = packets_cache[i].server_line;
             } else if (have_client) {
-                picked = pairs[i].client_line;
+                picked = packets_cache[i].client_line;
             }
             if (picked) {
                 fputs(picked, wfp);
                 fputc('\n', wfp);
+                count += 1;
             }
         }
         fclose(wfp);
         rename("logs/packets.jsonl.tmp", "logs/packets.jsonl");
     }
 
-    free(pairs);
     free(existing_lines);
     appendf(json, JSON_BUF, "{\"ok\":true,\"packets\":");
     append_packet_array(json, JSON_BUF, "logs/packets.jsonl");
-    appendf(json, JSON_BUF, ",\"count\":");
-    int count = 0;
-    FILE *cfp = fopen("logs/packets.jsonl", "r");
-    if (cfp) {
-        char buf[512];
-        while (fgets(buf, sizeof(buf), cfp)) {
-            if (buf[0] == '{') count++;
-        }
-        fclose(cfp);
-    }
-    appendf(json, JSON_BUF, "%d", count);
-    appendf(json, JSON_BUF, "}");
+    appendf(json, JSON_BUF, ",\"count\":%zu}", count);
     send_http(fd, "200 OK", "application/json; charset=utf-8", json);
     free(json);
 }
@@ -1010,6 +1108,9 @@ static void truncate_logs(void) {
     state.client_log_offset = 0;
     state.control_log_offset = 0;
     state.packets_log_offset = 0;
+    /* Reset the incremental packet cache too, otherwise the next api_packets
+       call would re-emit stale entries whose source logs have been wiped. */
+    packets_cache_reset();
 }
 
 static size_t build_protocol_envs(ChildEnv *envs, size_t cap) {
@@ -1166,32 +1267,59 @@ static void api_send_password(int fd, const char *body) {
     send_http(fd, "200 OK", "application/json", "{\"ok\":true}");
 }
 
-static void api_run_tests(int fd) {
-    FILE *pipe_fp;
-    FILE *out_fp;
-    char chunk[1024];
-    char result[8192] = {0};
+/* Append a chunk of in-progress test output to logs/test-results.json so the
+   frontend's /api/test/result polling can show partial progress. The chunk
+   is appended verbatim; the file is created/truncated by the runner on
+   startup. */
+static void append_test_results_chunk(const char *chunk, size_t len) {
+    static int initialized = 0;
+    FILE *fp;
+    if (!initialized) {
+        fp = fopen("logs/test-results.json", "w");
+        initialized = 1;
+        if (!fp) return;
+    } else {
+        fp = fopen("logs/test-results.json", "a");
+        if (!fp) return;
+    }
+    fwrite(chunk, 1, len, fp);
+    fclose(fp);
+}
 
-    stop_child(&state.server);
-    stop_child(&state.client);
-    pipe_fp = popen("./test/run_tests.sh --json 2>&1", "r");
-    if (!pipe_fp) {
-        send_http(fd, "500 Internal Server Error", "application/json", "{\"ok\":false,\"error\":\"cannot run tests\"}");
+static void api_run_tests(int fd, const char *body) {
+    (void)body;
+    char *args[] = {(char *)"./test/run_tests.sh", (char *)"--json", NULL};
+    if (child_running(&state.test)) {
+        send_http(fd, "409 Conflict", "application/json",
+                  "{\"ok\":false,\"error\":\"tests already running\"}");
         return;
     }
-    while (fgets(chunk, sizeof(chunk), pipe_fp)) {
-        if (strlen(result) + strlen(chunk) + 1 < sizeof(result)) {
-            strcat(result, chunk);
-        }
+    /* Truncate the in-progress results file before starting fresh. */
+    {
+        FILE *fp = fopen("logs/test-results.json", "w");
+        if (fp) fclose(fp);
     }
-    pclose(pipe_fp);
-    snprintf(state.last_test_result, sizeof(state.last_test_result), "%s", result);
-    out_fp = fopen("logs/test-results.json", "w");
-    if (out_fp) {
-        fputs(result, out_fp);
-        fclose(out_fp);
+    state.last_test_result[0] = '\0';
+    /* Run the test suite asynchronously: fork into the background; output
+       flows through the existing handle_child_output() pipe consumer, which
+       also appends each line to logs/test-results.json so the frontend's
+       /api/test/result polling sees progress. */
+    stop_child(&state.server);
+    stop_child(&state.client);
+    if (start_child(&state.test, args, 0, NULL, 0) != 0) {
+        send_http(fd, "500 Internal Server Error", "application/json",
+                  "{\"ok\":false,\"error\":\"cannot start test runner\"}");
+        return;
     }
-    send_http(fd, "200 OK", "application/json; charset=utf-8", result[0] ? result : "{\"ok\":false}");
+    LogEvent e = log_defaults("INFO", "TEST_RUN_STARTED", "tests started");
+    e.pid = state.test.pid;
+    experiment_apply_to_event(&e);
+    logger_write(&control_logger, &e);
+    char resp[160];
+    snprintf(resp, sizeof(resp),
+             "{\"ok\":true,\"status\":\"started\",\"pid\":%ld}",
+             (long)state.test.pid);
+    send_http(fd, "200 OK", "application/json", resp);
 }
 
 static void api_test_result(int fd) {
@@ -1233,8 +1361,10 @@ static void route_api(int fd, const char *method, const char *path, const char *
     } else if (strcmp(path, "/api/reset") == 0 && strcmp(method, "POST") == 0) {
         stop_child(&state.server);
         stop_child(&state.client);
+        stop_child(&state.test);
         child_init(&state.server, "server");
         child_init(&state.client, "client");
+        child_init(&state.test, "test");
         experiment_clear();
         /* 重置时同时清空所有日志文件（保留日志目录） */
         truncate_logs();
@@ -1246,7 +1376,7 @@ static void route_api(int fd, const char *method, const char *path, const char *
                   "\"reliable_loss_recovery\",\"reliable_reorder_recovery\",\"reliable_duplicate_recovery\","
                   "\"server_timeout\",\"missing_input\",\"sequence_error\"]}");
     } else if (strcmp(path, "/api/test/run") == 0 && strcmp(method, "POST") == 0) {
-        api_run_tests(fd);
+        api_run_tests(fd, body);
     } else if (strcmp(path, "/api/test/result") == 0) {
         api_test_result(fd);
     } else {
@@ -1308,6 +1438,18 @@ static int websocket_send_text(const char *text) {
     return 0;
 }
 
+/* Send a WebSocket close frame (opcode 0x8, no payload) and best-effort drain
+   to the peer before we close the underlying fd. Used when evicting the
+   previous WS client so the first tab sees a graceful close rather than a
+   raw TCP FIN. */
+static void send_ws_close_frame(int fd) {
+    static const uint8_t close_frame[2] = {0x88U, 0x00U};
+    if (fd < 0) {
+        return;
+    }
+    send(fd, close_frame, sizeof(close_frame), MSG_NOSIGNAL);
+}
+
 static void websocket_handshake(int fd, const char *request) {
     const char *key_start = strstr(request, "Sec-WebSocket-Key:");
     char key[128] = {0};
@@ -1341,6 +1483,10 @@ static void websocket_handshake(int fd, const char *request) {
              accept);
     send(fd, response, strlen(response), 0);
     if (state.ws_fd >= 0) {
+        /* Send a WS close frame so the previously-connected browser tab sees
+           a graceful disconnect (onclose handler runs cleanly) instead of an
+           abrupt TCP close. */
+        send_ws_close_frame(state.ws_fd);
         close(state.ws_fd);
     }
     state.ws_fd = fd;
@@ -1351,7 +1497,7 @@ static void websocket_handshake(int fd, const char *request) {
 static int read_http_request(int fd, char *buf, size_t cap) {
     ssize_t n;
     size_t used = 0;
-    int content_length = 0;
+    int content_length = -1;
     char *body;
     while (used + 1 < cap) {
         n = recv(fd, buf + used, cap - used - 1, 0);
@@ -1364,7 +1510,16 @@ static int read_http_request(int fd, char *buf, size_t cap) {
         if (body) {
             char *cl = strstr(buf, "Content-Length:");
             if (cl) {
-                content_length = atoi(cl + strlen("Content-Length:"));
+                /* Skip past the colon and any whitespace before the number
+                   so case / spacing variations don't trip atoi. */
+                cl += strlen("Content-Length:");
+                while (*cl == ' ' || *cl == '\t') {
+                    cl += 1;
+                }
+                content_length = atoi(cl);
+            }
+            if (content_length > HTTP_MAX_BODY) {
+                return -2;  /* caller returns 413 */
             }
             body += 4;
             if ((int)(used - (size_t)(body - buf)) >= content_length) {
@@ -1375,16 +1530,63 @@ static int read_http_request(int fd, char *buf, size_t cap) {
     return -1;
 }
 
+/* Parse the request line manually (method + path) without sscanf's silent
+   truncation behaviour. Returns 0 on success, -1 on parse failure. Method
+   and path buffers must be at least 16 and 512 bytes respectively. */
+static int parse_request_line(const char *line, char *method, size_t method_cap,
+                              char *path, size_t path_cap) {
+    const char *sp1 = strchr(line, ' ');
+    const char *sp2;
+    size_t mlen, plen;
+    if (!sp1) {
+        return -1;
+    }
+    mlen = (size_t)(sp1 - line);
+    if (mlen == 0 || mlen >= method_cap) {
+        return -1;
+    }
+    memcpy(method, line, mlen);
+    method[mlen] = '\0';
+    sp2 = strchr(sp1 + 1, ' ');
+    if (!sp2) {
+        sp2 = strstr(sp1 + 1, "\r");
+        if (!sp2) {
+            sp2 = strstr(sp1 + 1, "\n");
+        }
+        if (!sp2) {
+            return -1;
+        }
+    }
+    plen = (size_t)(sp2 - (sp1 + 1));
+    if (plen == 0 || plen >= path_cap) {
+        return -1;
+    }
+    memcpy(path, sp1 + 1, plen);
+    path[plen] = '\0';
+    return 0;
+}
+
 static void handle_http_client(int fd) {
     char request[HTTP_BUF];
     char method[16] = {0};
     char path[512] = {0};
     char *body;
-    if (read_http_request(fd, request, sizeof(request)) < 0) {
+    int rc = read_http_request(fd, request, sizeof(request));
+    if (rc == -2) {
+        send_http(fd, "413 Payload Too Large", "application/json",
+                  "{\"error\":\"body too large\"}");
         close(fd);
         return;
     }
-    sscanf(request, "%15s %511s", method, path);
+    if (rc < 0) {
+        close(fd);
+        return;
+    }
+    if (parse_request_line(request, method, sizeof(method), path, sizeof(path)) != 0) {
+        send_http(fd, "400 Bad Request", "application/json", "{\"error\":\"bad request line\"}");
+        close(fd);
+        return;
+    }
     body = strstr(request, "\r\n\r\n");
     body = body ? body + 4 : request + strlen(request);
     if (strcmp(path, "/ws") == 0) {
@@ -1406,6 +1608,14 @@ static void push_log_tail(const char *role, const char *path, long *offset) {
     if (!fp) {
         return;
     }
+    /* Detect external truncation (e.g. user `>` the log, or our own
+       truncate_logs): if saved offset is past EOF, reset to 0. */
+    if (*offset > 0) {
+        struct stat st;
+        if (fstat(fileno(fp), &st) == 0 && st.st_size < *offset) {
+            *offset = 0;
+        }
+    }
     fseek(fp, *offset, SEEK_SET);
     while (fgets(line, sizeof(line), fp)) {
         size_t len = strlen(line);
@@ -1417,7 +1627,33 @@ static void push_log_tail(const char *role, const char *path, long *offset) {
             websocket_send_text(msg);
         }
     }
-    *offset = ftell(fp);
+    /* Partial-line guard: if the last line did not end with a newline, the
+       writer is still flushing. Roll the saved offset back to the start of
+       that line so the next loop iteration re-reads and pushes it once it
+       completes — avoids emitting the same partial line twice on the WS. */
+    long end = ftell(fp);
+    if (end > 0) {
+        if (fseek(fp, end - 1, SEEK_SET) == 0) {
+            int c = fgetc(fp);
+            if (c != '\n' && c != EOF) {
+                /* Find start of last (unterminated) line. */
+                long pos = end - 1;
+                while (pos > *offset) {
+                    if (fseek(fp, pos, SEEK_SET) != 0) break;
+                    c = fgetc(fp);
+                    if (c == '\n') { pos += 1; break; }
+                    pos -= 1;
+                }
+                *offset = pos;
+            } else {
+                *offset = end;
+            }
+        } else {
+            *offset = end;
+        }
+    } else {
+        *offset = 0;
+    }
     fclose(fp);
 }
 
@@ -1481,6 +1717,7 @@ int main(int argc, char **argv) {
     ensure_runtime_dirs();
     child_init(&state.server, "server");
     child_init(&state.client, "client");
+    child_init(&state.test, "test");
     experiment_clear();
     state.ws_fd = -1;
     if (logger_open(&control_logger, "control", "logs/control.jsonl") != 0) {
@@ -1521,6 +1758,14 @@ int main(int argc, char **argv) {
             FD_SET(state.ws_fd, &readfds);
             if (state.ws_fd > maxfd) maxfd = state.ws_fd;
         }
+        if (state.test.stdout_fd >= 0) {
+            FD_SET(state.test.stdout_fd, &readfds);
+            if (state.test.stdout_fd > maxfd) maxfd = state.test.stdout_fd;
+        }
+        if (state.test.stderr_fd >= 0) {
+            FD_SET(state.test.stderr_fd, &readfds);
+            if (state.test.stderr_fd > maxfd) maxfd = state.test.stderr_fd;
+        }
         tv.tv_sec = 1;
         tv.tv_usec = 0;
         if (select(maxfd + 1, &readfds, NULL, NULL, &tv) < 0) {
@@ -1547,16 +1792,101 @@ int main(int argc, char **argv) {
         if (state.client.stderr_fd >= 0 && FD_ISSET(state.client.stderr_fd, &readfds)) {
             handle_child_output(&state.client, state.client.stderr_fd, "stderr");
         }
+        if (state.test.stdout_fd >= 0 && FD_ISSET(state.test.stdout_fd, &readfds)) {
+            /* Drain test runner stdout ourselves and append verbatim to
+               logs/test-results.json so /api/test/result returns partial
+               progress. handle_child_output() truncates to 512 bytes which
+               would lose the full JSON. */
+            char buf[1024];
+            ssize_t n = read(state.test.stdout_fd, buf, sizeof(buf));
+            if (n > 0) {
+                append_test_results_chunk(buf, (size_t)n);
+                /* Mirror into the last_test_result buffer for /api/test/result. */
+                size_t cur = strlen(state.last_test_result);
+                if (cur + (size_t)n + 1 < sizeof(state.last_test_result)) {
+                    memcpy(state.last_test_result + cur, buf, (size_t)n);
+                    state.last_test_result[cur + (size_t)n] = '\0';
+                }
+                LogEvent e = log_defaults("INFO", "TEST_RUN_OUTPUT", "tests running");
+                e.pid = state.test.pid;
+                e.peer = "stdout";
+                e.message = "test runner output";
+                experiment_apply_to_event(&e);
+                logger_write(&control_logger, &e);
+            } else {
+                /* EOF (n == 0) or error (n < 0): the pipe is no longer useful.
+                   Close the fd and reap so we don't busy-loop on it. */
+                close(state.test.stdout_fd);
+                state.test.stdout_fd = -1;
+                reap_child(&state.test);
+            }
+        }
+        if (state.test.stderr_fd >= 0 && FD_ISSET(state.test.stderr_fd, &readfds)) {
+            char ebuf[512];
+            ssize_t en = read(state.test.stderr_fd, ebuf, sizeof(ebuf) - 1);
+            if (en <= 0) {
+                close(state.test.stderr_fd);
+                state.test.stderr_fd = -1;
+            } else {
+                /* Mirror to control_logger only; the stderr stream is rarely
+                   interesting for the test runner and doesn't need to be
+                   appended to the JSON output. */
+                ebuf[en] = '\0';
+                LogEvent ee = log_defaults("INFO", "TEST_RUN_STDERR", "tests running");
+                ee.pid = state.test.pid;
+                ee.peer = "stderr";
+                ee.message = ebuf;
+                experiment_apply_to_event(&ee);
+                logger_write(&control_logger, &ee);
+            }
+        }
         if (state.ws_fd >= 0 && FD_ISSET(state.ws_fd, &readfds)) {
-            char discard[256];
-            ssize_t n = recv(state.ws_fd, discard, sizeof(discard), 0);
+            uint8_t header[2];
+            ssize_t n = recv(state.ws_fd, header, sizeof(header), 0);
             if (n <= 0) {
                 close(state.ws_fd);
                 state.ws_fd = -1;
+            } else if (n == 2) {
+                /* Minimal inbound-frame handling: respond to ping with pong
+                   (echoes the payload up to 125 bytes), echo close frame, and
+                   drop everything else. Without this, the server never answers
+                   pings and a browser-driven ping/pong loop stalls. */
+                uint8_t opcode = header[0] & 0x0fU;
+                uint8_t masked = header[1] & 0x80U;
+                uint8_t plen = header[1] & 0x7fU;
+                uint8_t pong_hdr[2] = {0x8AU, plen};
+                if (opcode == 0x9U) {
+                    /* PING: send a PONG frame with the same payload length. */
+                    send(state.ws_fd, pong_hdr, 2, MSG_NOSIGNAL);
+                    if (plen > 0) {
+                        char payload[125];
+                        ssize_t got = recv(state.ws_fd, payload, plen, 0);
+                        if (got > 0) {
+                            send(state.ws_fd, payload, (size_t)got, MSG_NOSIGNAL);
+                        }
+                    }
+                } else if (opcode == 0x8U) {
+                    /* CLOSE from client: send our own close frame and disconnect. */
+                    send_ws_close_frame(state.ws_fd);
+                    close(state.ws_fd);
+                    state.ws_fd = -1;
+                } else if (plen > 0) {
+                    /* Discard the payload to keep the stream aligned. */
+                    char discard[256];
+                    size_t left = plen;
+                    if (masked) left += 4;
+                    while (left > 0) {
+                        size_t want = left > sizeof(discard) ? sizeof(discard) : left;
+                        ssize_t got = recv(state.ws_fd, discard, want, 0);
+                        if (got <= 0) break;
+                        left -= (size_t)got;
+                    }
+                }
             }
         }
         reap_child(&state.server);
         reap_child(&state.client);
+        reap_child(&state.test);
         if (state.ws_fd >= 0) {
             push_log_tail("server", "logs/server.jsonl", &state.server_log_offset);
             push_log_tail("client", "logs/client.jsonl", &state.client_log_offset);
@@ -1570,6 +1900,7 @@ int main(int argc, char **argv) {
 
     stop_child(&state.server);
     stop_child(&state.client);
+    stop_child(&state.test);
     if (state.ws_fd >= 0) {
         close(state.ws_fd);
     }

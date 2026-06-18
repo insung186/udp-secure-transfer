@@ -1,18 +1,21 @@
 CC := gcc
-CFLAGS := -D_POSIX_C_SOURCE=200809L -std=c11 -Wall -Wextra -O2 -g -Iinclude
-LDFLAGS :=
+CFLAGS := -D_POSIX_C_SOURCE=200809L -D_FORTIFY_SOURCE=2 -fstack-protector-strong -std=c11 -Wall -Wextra -O2 -g -Iinclude
+LDFLAGS := -Wl,-z,relro -Wl,-z,now
 
 BIN_DIR := bin
 COMMON_OBJS := build/protocol.o build/logger.o build/sha1_util.o
 DEMO_COMMON_OBJS := build/logger.o build/sha1_util.o build/protocol.o build/demo_util.o
 
-.PHONY: all clean
+.PHONY: all clean test
 
 all: $(BIN_DIR)/server $(BIN_DIR)/client $(BIN_DIR)/control_server \
 	$(BIN_DIR)/tcp_server $(BIN_DIR)/tcp_client $(BIN_DIR)/tls_server $(BIN_DIR)/tls_client \
 	$(BIN_DIR)/http_demo_server $(BIN_DIR)/http_demo_client \
 	$(BIN_DIR)/websocket_demo_server $(BIN_DIR)/websocket_demo_client \
 	$(BIN_DIR)/quic_demo_server $(BIN_DIR)/quic_demo_client
+
+test: all
+	./test/run_tests.sh
 
 build:
 	mkdir -p build logs output test/cases

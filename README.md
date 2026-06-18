@@ -97,6 +97,7 @@ make clean
 - `tls-like` 不是 TLS，只演示握手、HMAC 完整性与“有加密 / 无加密”的教学概念
 - `quic-like` 不是完整 QUIC，只演示连接 ID、多 stream、ACK / 重传、0-RTT 风险
 - 这些安全性质仅用于课堂演示，不代表生产级安全
+- `tls-like` 客户端会在 handshake 完成后输出一条 `WARN/TLS_NO_SERVER_AUTH` 日志，明确告知 “没有服务端身份认证 / 知道密码即可 MITM”，避免误用
 
 ## UDP / TCP 基础消息格式
 

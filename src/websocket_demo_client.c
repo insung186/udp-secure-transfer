@@ -78,7 +78,9 @@ static int send_frame(Logger *logger, int fd, const char *peer, uint8_t opcode,
 static int recv_frame(Logger *logger, int fd, const char *peer, uint8_t *opcode,
                       uint8_t *payload, size_t *payload_len) {
     uint8_t header[2];
-    uint8_t wire[2 + WS_MAX_PAYLOAD];
+    uint8_t ext[2];
+    uint8_t wire[2 + 2 + WS_MAX_PAYLOAD];
+    uint64_t pl = 0;
     char wire_hex[321];
     char uid[24];
     LogEvent e;
@@ -86,26 +88,44 @@ static int recv_frame(Logger *logger, int fd, const char *peer, uint8_t *opcode,
         return -1;
     }
     *opcode = header[0] & 0x0fU;
-    *payload_len = header[1] & 0x7fU;
-    if (*payload_len > WS_MAX_PAYLOAD) {
+    /* RFC 6455 §5.2 payload length decoding (mirror of server). */
+    if ((header[1] & 0x7fU) < 126) {
+        pl = header[1] & 0x7fU;
+    } else if ((header[1] & 0x7fU) == 126) {
+        if (demo_read_all(fd, ext, sizeof(ext)) != 0) {
+            return -1;
+        }
+        pl = ((uint32_t)ext[0] << 8) | ext[1];
+    } else {
+        /* 64-bit length: not supported here because we cap at WS_MAX_PAYLOAD. */
         return -1;
     }
+    if (pl > WS_MAX_PAYLOAD) {
+        return -1;
+    }
+    *payload_len = (size_t)pl;
     wire[0] = header[0];
     wire[1] = header[1];
+    size_t wire_used = 2;
+    if ((header[1] & 0x7fU) == 126) {
+        wire[wire_used++] = ext[0];
+        wire[wire_used++] = ext[1];
+    }
     if (*payload_len > 0 && demo_read_all(fd, payload, *payload_len) != 0) {
         return -1;
     }
-    memcpy(wire + 2, payload, *payload_len);
+    memcpy(wire + wire_used, payload, *payload_len);
+    wire_used += *payload_len;
     demo_init_event(&e, "INFO", "RECV_WS_FRAME", "DATA_TRANSFER", "websocket frame received");
-    bytes_to_hex(wire, 2 + *payload_len > 160 ? 160 : 2 + *payload_len, wire_hex, sizeof(wire_hex));
-    compute_packet_uid(uid, sizeof(uid), (uint16_t)(*opcode == 0x1U ? 42 : *opcode == 0x9U ? 43 : *opcode == 0xAU ? 44 : 45), 0, 0, wire, 2 + *payload_len);
+    bytes_to_hex(wire, wire_used > 160 ? 160 : wire_used, wire_hex, sizeof(wire_hex));
+    compute_packet_uid(uid, sizeof(uid), (uint16_t)(*opcode == 0x1U ? 42 : *opcode == 0x9U ? 43 : *opcode == 0xAU ? 44 : 45), 0, 0, wire, wire_used);
     e.peer = peer;
     e.direction = "Server -> Client";
     e.packet_type = *opcode == 0x1U ? "TEXT" : *opcode == 0x9U ? "PING" : *opcode == 0xAU ? "PONG" : "CLOSE";
     e.packet_code = *opcode == 0x1U ? 42 : *opcode == 0x9U ? 43 : *opcode == 0xAU ? 44 : 45;
     e.frame_type = *opcode == 0x1U ? "text" : *opcode == 0x9U ? "ping" : *opcode == 0xAU ? "pong" : "close";
-    e.payload_length = (int)(2 + *payload_len);
-    e.bytes = (int)(2 + *payload_len);
+    e.payload_length = (int)wire_used;
+    e.bytes = (int)wire_used;
     e.packet_uid = uid;
     e.wire_hex = wire_hex;
     logger_write(logger, &e);
@@ -149,6 +169,7 @@ int main(int argc, char **argv) {
         logger_close(&logger);
         return 1;
     }
+    /* WebSocket upgrade sends password once; interactive flag is informational. */
     (void)interactive;
     if (parse_port(argv[2], &port) != 0) {
         demo_finish(&logger, "ABORT", "invalid port");

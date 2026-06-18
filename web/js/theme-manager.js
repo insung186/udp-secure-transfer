@@ -145,19 +145,35 @@
   }
 
   // 填充主题下拉框：仅保留短名称（中文显示 nameZh，英文显示 name）
+  //
+  // 增量更新而非 innerHTML 重写：保留用户的键盘焦点 / 滚动位置 / 打开状态，
+  // 否则 setTheme / refreshLabels 在 dropdown 打开时强制 select.value = target
+  // 会让用户失去当前选择。
   function fillThemeSelect() {
     const select = document.getElementById('theme-select');
     if (!select) return;
     const current = document.documentElement.dataset.theme || DEFAULT_THEME;
     const isEn = document.documentElement.lang === 'en';
-    select.innerHTML = '';
-    THEMES.forEach((theme) => {
-      const opt = document.createElement('option');
-      opt.value = theme.id;
-      // 下拉框只保留短名称
-      opt.textContent = isEn ? theme.name : theme.nameZh;
-      if (theme.id === current) opt.selected = true;
-      select.appendChild(opt);
+    const wanted = THEMES.map((theme) => ({
+      id: theme.id,
+      label: isEn ? theme.name : theme.nameZh,
+    }));
+    // Add or update each option in place.
+    const seen = new Set();
+    wanted.forEach((entry) => {
+      seen.add(entry.id);
+      let opt = select.querySelector(`option[value="${entry.id}"]`);
+      if (!opt) {
+        opt = document.createElement('option');
+        opt.value = entry.id;
+        select.appendChild(opt);
+      }
+      opt.textContent = entry.label;
+      opt.selected = entry.id === current;
+    });
+    // Remove options for themes that no longer exist (e.g. legacy).
+    Array.from(select.options).forEach((opt) => {
+      if (!seen.has(opt.value)) opt.remove();
     });
   }
 
