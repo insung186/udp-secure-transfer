@@ -1,0 +1,9 @@
+{
+  "protocol": "mqtt",
+  "scenarios": [
+    {"id": "normal", "name": "正常 pub/sub", "description": "客户端订阅 sensors/temp，发布 QoS 0 消息，broker 转发。"},
+    {"id": "qos2-replay", "name": "QoS 2 防重放", "description": "同一 message_id 重复到达，演示 QoS 2 的 4 次握手防重放。"},
+    {"id": "unauth-subscribe", "name": "受限主题订阅", "description": "未认证 client 尝试订阅受限主题，server 拒绝。"},
+    {"id": "cleartext-eavesdrop", "name": "明文嗅探风险", "description": "演示 MQTT 缺少 TLS 时 payload 可被中间人读取（教学告警）。"}
+  ]
+}

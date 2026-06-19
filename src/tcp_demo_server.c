@@ -73,10 +73,18 @@ static void build_frame_wire(uint16_t type, const uint8_t *payload, uint32_t pay
     *wire_len = DEMO_HEADER_SIZE + payload_len;
 }
 
+/* 把 byte stream 偏移和 logical packet index 解耦：
+   - stream_offset 仍写入 e.stream_offset（用于流式重放的诊断信息）
+   - logical_pid  写入 e.packet_id / e.seq（0,1,2,... 的逻辑包序号，前端分片矩阵靠这个）
+   - auth 阶段没有 logical pid，调用方传 -1。
+   原因：服务端 send_offset 和客户端 recv_offset 在 auth 后会差出 N 字节（各自先收
+   了不同的 PASS_REQ / PASS_RESP 帧），如果直接用 stream_offset 当 packet_id，server
+   和 client 的同一 wire 包会得到不同的 packet_id，进而 packet_uid 也不一致，
+   前端矩阵把同一包算成"丢失"——这是教学上最容易被学生误判的假象。 */
 static void log_frame(Logger *logger, const char *level, const char *event,
                       const char *state, const char *peer, uint16_t type,
                       const uint8_t *payload, uint32_t payload_len,
-                      const char *direction, int stream_offset) {
+                      const char *direction, int stream_offset, int logical_pid) {
     uint8_t wire[DEMO_MAX_FRAME];
     size_t wire_len = 0;
     char hex[DEMO_MAX_FRAME * 2 + 1];
@@ -93,11 +101,13 @@ static void log_frame(Logger *logger, const char *level, const char *event,
     e.direction = direction;
     e.stream_offset = stream_offset;
     if (type == DEMO_PKT_DATA || type == DEMO_PKT_APP_DATA) {
-        e.packet_id = stream_offset;
-        e.seq = stream_offset;
+        e.packet_id = logical_pid;
+        e.seq = logical_pid;
     }
     e.wire_hex = hex;
-    compute_packet_uid(uid, sizeof(uid), type, stream_offset, 0, wire, wire_len);
+    /* packet_uid 派生：server / client 两端用同一 logical_pid 才能算出相同 UID。
+       auth 阶段 packet_id = -1 时直接走 stream_offset 兜底（这些包不存在"两端同源"问题）。 */
+    compute_packet_uid(uid, sizeof(uid), type, logical_pid >= 0 ? logical_pid : stream_offset, 0, wire, wire_len);
     e.packet_uid = uid;
     logger_write(logger, &e);
 }
@@ -105,24 +115,25 @@ static void log_frame(Logger *logger, const char *level, const char *event,
 static int send_frame_logged(Logger *logger, int fd, const char *peer, uint16_t type,
                              const uint8_t *payload, uint32_t payload_len,
                              const char *state, const char *event, int *stream_offset,
-                             int fragment_mode) {
+                             int logical_pid, int fragment_mode) {
     if (demo_send_frame(fd, type, payload, payload_len, fragment_mode) != 0) {
         return -1;
     }
     log_frame(logger, (type == DEMO_PKT_DATA || type == DEMO_PKT_APP_DATA) ? "DATA" : "INFO",
-              event, state, peer, type, payload, payload_len, "Server -> Client", *stream_offset);
+              event, state, peer, type, payload, payload_len, "Server -> Client", *stream_offset, logical_pid);
     *stream_offset += DEMO_HEADER_SIZE + (int)payload_len;
     return 0;
 }
 
 static int recv_frame_logged(Logger *logger, int fd, const char *peer, DemoFrame *frame,
-                             const char *state, const char *event, int *stream_offset) {
+                             const char *state, const char *event, int *stream_offset,
+                             int logical_pid) {
     if (demo_recv_frame(fd, frame) != 0) {
         return -1;
     }
     log_frame(logger, (frame->type == DEMO_PKT_DATA || frame->type == DEMO_PKT_APP_DATA) ? "DATA" : "INFO",
               event, state, peer, frame->type, frame->payload, frame->length,
-              "Client -> Server", *stream_offset);
+              "Client -> Server", *stream_offset, logical_pid);
     *stream_offset += DEMO_HEADER_SIZE + (int)frame->length;
     return 0;
 }
@@ -140,7 +151,7 @@ static int run_tcp_basic(Logger *logger, int client_fd, const char *peer_text,
     }
     while ((n = (uint32_t)fread(buf, 1, sizeof(buf), fp)) > 0) {
         if (send_frame_logged(logger, client_fd, peer_text, DEMO_PKT_DATA, buf, n,
-                              "DATA_TRANSFER", "SEND_DATA", &send_offset,
+                              "DATA_TRANSFER", "SEND_DATA", &send_offset, chunks,
                               fragment_mode && chunks == 0) != 0) {
             fclose(fp);
             return -1;
@@ -156,7 +167,7 @@ static int run_tcp_basic(Logger *logger, int client_fd, const char *peer_text,
     }
     fclose(fp);
     if (send_frame_logged(logger, client_fd, peer_text, DEMO_PKT_TERMINATE, digest, SHA1_DIGEST_LENGTH,
-                          "VERIFY", "SEND_TERMINATE", &send_offset, 0) != 0) {
+                          "VERIFY", "SEND_TERMINATE", &send_offset, -1, 0) != 0) {
         return -1;
     }
     demo_finish(logger, "OK", "tcp-basic transfer completed");
@@ -184,7 +195,7 @@ static int run_tls_like(Logger *logger, int client_fd, const char *peer_text,
         return -1;
     }
 
-    if (recv_frame_logged(logger, client_fd, peer_text, &frame, "HANDSHAKE", "RECV_CLIENT_HELLO", &recv_offset) != 0 ||
+    if (recv_frame_logged(logger, client_fd, peer_text, &frame, "HANDSHAKE", "RECV_CLIENT_HELLO", &recv_offset, -1) != 0 ||
         frame.type != DEMO_PKT_CLIENT_HELLO || frame.length != sizeof(client_nonce)) {
         fclose(fp);
         return -1;
@@ -192,7 +203,7 @@ static int run_tls_like(Logger *logger, int client_fd, const char *peer_text,
     memcpy(client_nonce, frame.payload, sizeof(client_nonce));
     demo_random_nonce(server_nonce, sizeof(server_nonce));
     if (send_frame_logged(logger, client_fd, peer_text, DEMO_PKT_SERVER_HELLO, server_nonce, sizeof(server_nonce),
-                          "HANDSHAKE", "SEND_SERVER_HELLO", &send_offset, 0) != 0) {
+                          "HANDSHAKE", "SEND_SERVER_HELLO", &send_offset, -1, 0) != 0) {
         return -1;
     }
 
@@ -200,7 +211,7 @@ static int run_tls_like(Logger *logger, int client_fd, const char *peer_text,
                             server_nonce, sizeof(server_nonce), session_key);
     demo_hmac_sha1(session_key, sizeof(session_key),
                    (const uint8_t *)"client-finished", strlen("client-finished"), expected);
-    if (recv_frame_logged(logger, client_fd, peer_text, &frame, "HANDSHAKE", "RECV_FINISHED", &recv_offset) != 0 ||
+    if (recv_frame_logged(logger, client_fd, peer_text, &frame, "HANDSHAKE", "RECV_FINISHED", &recv_offset, -1) != 0 ||
         frame.type != DEMO_PKT_FINISHED || frame.length != sizeof(expected)) {
         fclose(fp);
         return -1;
@@ -224,7 +235,7 @@ static int run_tls_like(Logger *logger, int client_fd, const char *peer_text,
         reply[0] ^= 0x33U;
     }
     if (send_frame_logged(logger, client_fd, peer_text, DEMO_PKT_FINISHED, reply, sizeof(reply),
-                          "HANDSHAKE", "SEND_FINISHED", &send_offset, 0) != 0) {
+                          "HANDSHAKE", "SEND_FINISHED", &send_offset, -1, 0) != 0) {
         fclose(fp);
         return -1;
     }
@@ -234,6 +245,7 @@ static int run_tls_like(Logger *logger, int client_fd, const char *peer_text,
         return 1;
     }
 
+    int app_pid = 0;  /* 0-based logical APP_DATA id；server / client 必须保持一致 */
     while ((file_len = fread(file_buf, 1, sizeof(file_buf), fp)) > 0) {
         uint8_t app_payload[DEMO_MAX_PAYLOAD];
         uint32_t app_len = 0;
@@ -244,13 +256,13 @@ static int run_tls_like(Logger *logger, int client_fd, const char *peer_text,
             return -1;
         }
         if (send_frame_logged(logger, client_fd, peer_text, DEMO_PKT_APP_DATA, app_payload, app_len,
-                              "DATA_TRANSFER", "SEND_APP_DATA", &send_offset, 0) != 0) {
+                              "DATA_TRANSFER", "SEND_APP_DATA", &send_offset, app_pid, 0) != 0) {
             fclose(fp);
             return -1;
         }
         if (replay_mode && seq == 1) {
             if (send_frame_logged(logger, client_fd, peer_text, DEMO_PKT_APP_DATA, app_payload, app_len,
-                                  "DATA_TRANSFER", "SEND_APP_DATA_REPLAY", &send_offset, 0) != 0) {
+                                  "DATA_TRANSFER", "SEND_APP_DATA_REPLAY", &send_offset, app_pid, 0) != 0) {
                 fclose(fp);
                 return -1;
             }
@@ -259,6 +271,7 @@ static int run_tls_like(Logger *logger, int client_fd, const char *peer_text,
             return 1;
         }
         seq += 1;
+        app_pid += 1;
     }
     fclose(fp);
     if (tamper_app_data) {
@@ -277,7 +290,7 @@ static int run_tls_like(Logger *logger, int client_fd, const char *peer_text,
         logger_write(logger, &e);
     }
     if (send_frame_logged(logger, client_fd, peer_text, DEMO_PKT_TERMINATE, digest, SHA1_DIGEST_LENGTH,
-                          "VERIFY", "SEND_TERMINATE", &send_offset, 0) != 0) {
+                          "VERIFY", "SEND_TERMINATE", &send_offset, -1, 0) != 0) {
         return -1;
     }
     demo_finish(logger, "OK", "tls-like transfer completed");
@@ -347,7 +360,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     peer_to_string(&peer, peer_text, sizeof(peer_text));
-    if (recv_frame_logged(&logger, client_fd, peer_text, &frame, "WAIT_JOIN_REQ", "RECV_JOIN_REQ", &recv_offset) != 0 ||
+    if (recv_frame_logged(&logger, client_fd, peer_text, &frame, "WAIT_JOIN_REQ", "RECV_JOIN_REQ", &recv_offset, -1) != 0 ||
         frame.type != DEMO_PKT_JOIN_REQ) {
         demo_finish(&logger, "ABORT", "expected JOIN_REQ");
         close(client_fd);
@@ -356,7 +369,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (send_frame_logged(&logger, client_fd, peer_text, DEMO_PKT_PASS_REQ, NULL, 0,
-                          "AUTH", "SEND_PASS_REQ", &send_offset, 0) != 0) {
+                          "AUTH", "SEND_PASS_REQ", &send_offset, -1, 0) != 0) {
         demo_finish(&logger, "ABORT", "failed to send PASS_REQ");
         close(client_fd);
         close(listener_fd);
@@ -364,7 +377,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     while (!stop_requested && attempt < 3 && !authed) {
-        if (recv_frame_logged(&logger, client_fd, peer_text, &frame, "AUTH", "RECV_PASS_RESP", &recv_offset) != 0 ||
+        if (recv_frame_logged(&logger, client_fd, peer_text, &frame, "AUTH", "RECV_PASS_RESP", &recv_offset, -1) != 0 ||
             frame.type != DEMO_PKT_PASS_RESP) {
             demo_finish(&logger, "ABORT", "expected PASS_RESP");
             close(client_fd);
@@ -376,7 +389,7 @@ int main(int argc, char **argv) {
         if (frame.length == strlen(password) && memcmp(frame.payload, password, frame.length) == 0) {
             authed = 1;
             if (send_frame_logged(&logger, client_fd, peer_text, DEMO_PKT_PASS_ACCEPT, NULL, 0,
-                                  "AUTH", "SEND_PASS_ACCEPT", &send_offset, 0) != 0) {
+                                  "AUTH", "SEND_PASS_ACCEPT", &send_offset, -1, 0) != 0) {
                 demo_finish(&logger, "ABORT", "failed to send PASS_ACCEPT");
                 close(client_fd);
                 close(listener_fd);
@@ -385,7 +398,7 @@ int main(int argc, char **argv) {
             }
         } else if (attempt >= 3) {
             send_frame_logged(&logger, client_fd, peer_text, DEMO_PKT_REJECT, NULL, 0,
-                              "AUTH", "SEND_REJECT", &send_offset, 0);
+                              "AUTH", "SEND_REJECT", &send_offset, -1, 0);
             demo_finish(&logger, "ABORT", "authentication failed");
             close(client_fd);
             close(listener_fd);
@@ -393,7 +406,7 @@ int main(int argc, char **argv) {
             return 1;
         } else {
             send_frame_logged(&logger, client_fd, peer_text, DEMO_PKT_PASS_REQ, NULL, 0,
-                              "AUTH", "SEND_PASS_REQ", &send_offset, 0);
+                              "AUTH", "SEND_PASS_REQ", &send_offset, -1, 0);
         }
     }
 

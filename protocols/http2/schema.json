@@ -1,0 +1,26 @@
+{
+  "id": "http2",
+  "name": "HTTP/2",
+  "name_en": "HTTP/2",
+  "version": "2",
+  "transport": "tcp",
+  "summary": "教学版 HTTP/2（h2c）：二进制分帧 + 多路复用 + 简化 HPACK，演示流并发、流取消、帧解析错误。",
+  "transferView": "transaction",
+  "sequenceStages": ["PREFACE", "SETTINGS", "HEADERS", "DATA", "WINDOW_UPDATE", "PING", "RST_STREAM", "GOAWAY"],
+  "packetTypes": [
+    {"code": 160, "name": "PREFACE"},
+    {"code": 161, "name": "SETTINGS"},
+    {"code": 162, "name": "HEADERS"},
+    {"code": 163, "name": "DATA"},
+    {"code": 164, "name": "WINDOW_UPDATE"},
+    {"code": 165, "name": "PING"},
+    {"code": 166, "name": "RST_STREAM"},
+    {"code": 167, "name": "GOAWAY"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "stream_id",
+    "frame_type", "header_summary", "payload_length", "bytes",
+    "packet_uid", "wire_hex"
+  ]
+}

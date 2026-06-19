@@ -1,0 +1,28 @@
+{
+  "id": "mqtt",
+  "name": "MQTT",
+  "name_en": "MQTT",
+  "version": "2",
+  "transport": "tcp",
+  "summary": "教学版 MQTT 3.1.1：基于 TCP 的 pub/sub 协议，2 字节定长头 + 可变长 + payload，演示 QoS 0/1/2、retain、ACL、QoS 2 防重放 4 次握手。",
+  "transferView": "message",
+  "sequenceStages": ["CONNECT", "CONNACK", "SUBSCRIBE", "SUBACK", "PUBLISH", "PUBACK", "PUBREC", "PUBREL", "PUBCOMP", "DISCONNECT"],
+  "packetTypes": [
+    {"code": 140, "name": "CONNECT"},
+    {"code": 141, "name": "CONNACK"},
+    {"code": 142, "name": "SUBSCRIBE"},
+    {"code": 143, "name": "SUBACK"},
+    {"code": 144, "name": "PUBLISH"},
+    {"code": 145, "name": "PUBACK"},
+    {"code": 146, "name": "PUBREC"},
+    {"code": 147, "name": "PUBREL"},
+    {"code": 148, "name": "PUBCOMP"},
+    {"code": 149, "name": "DISCONNECT"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "message_id",
+    "topic", "qos", "retain", "payload_length", "bytes",
+    "packet_uid", "wire_hex"
+  ]
+}

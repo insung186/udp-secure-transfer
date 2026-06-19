@@ -1,0 +1,9 @@
+{
+  "protocol": "oauth2",
+  "scenarios": [
+    {"id": "auth-code", "name": "授权码流", "description": "标准 OAuth 2.0 authorization_code 流，client 用 code 换取 access_token。"},
+    {"id": "pkce", "name": "PKCE 强制", "description": "client 必须携带 code_verifier，server 验证 code_challenge = SHA256(verifier)。"},
+    {"id": "implicit-deprecated", "name": "隐式流（废弃）", "description": "通过 URL fragment 返回 access_token（教学演示为何被废弃）。"},
+    {"id": "token-replay", "name": "Token 重放", "description": "client 重复使用同一个 authorization_code，server 检测并拒绝。"}
+  ]
+}

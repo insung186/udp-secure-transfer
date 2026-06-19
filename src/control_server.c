@@ -129,7 +129,10 @@ static void experiment_configure(const char *protocol, const char *scenario) {
     if (strncmp(state.experiment.protocol, "tcp", 3) == 0 ||
         strcmp(state.experiment.protocol, "tls-like") == 0 ||
         strcmp(state.experiment.protocol, "http-basic") == 0 ||
-        strcmp(state.experiment.protocol, "websocket-basic") == 0) {
+        strcmp(state.experiment.protocol, "websocket-basic") == 0 ||
+        strcmp(state.experiment.protocol, "oauth2") == 0 ||
+        strcmp(state.experiment.protocol, "mqtt") == 0 ||
+        strcmp(state.experiment.protocol, "http2") == 0) {
         snprintf(state.experiment.transport, sizeof(state.experiment.transport), "%s", "tcp");
     } else {
         snprintf(state.experiment.transport, sizeof(state.experiment.transport), "%s", "udp");
@@ -161,6 +164,25 @@ static const char *server_binary_for_protocol(const char *protocol) {
     if (strcmp(protocol, "quic-like") == 0) {
         return "./bin/quic_demo_server";
     }
+    /* Phase 2 protocols */
+    if (strcmp(protocol, "dns") == 0) {
+        return "./bin/dns_demo_server";
+    }
+    if (strcmp(protocol, "oauth2") == 0) {
+        return "./bin/oauth2_demo_server";
+    }
+    if (strcmp(protocol, "mqtt") == 0) {
+        return "./bin/mqtt_demo_server";
+    }
+    if (strcmp(protocol, "http2") == 0) {
+        return "./bin/http2_demo_server";
+    }
+    if (strcmp(protocol, "sip") == 0) {
+        return "./bin/sip_demo_server";
+    }
+    if (strcmp(protocol, "radius") == 0) {
+        return "./bin/radius_demo_server";
+    }
     return NULL;
 }
 
@@ -182,6 +204,25 @@ static const char *client_binary_for_protocol(const char *protocol) {
     }
     if (strcmp(protocol, "quic-like") == 0) {
         return "./bin/quic_demo_client";
+    }
+    /* Phase 2 protocols */
+    if (strcmp(protocol, "dns") == 0) {
+        return "./bin/dns_demo_client";
+    }
+    if (strcmp(protocol, "oauth2") == 0) {
+        return "./bin/oauth2_demo_client";
+    }
+    if (strcmp(protocol, "mqtt") == 0) {
+        return "./bin/mqtt_demo_client";
+    }
+    if (strcmp(protocol, "http2") == 0) {
+        return "./bin/http2_demo_client";
+    }
+    if (strcmp(protocol, "sip") == 0) {
+        return "./bin/sip_demo_client";
+    }
+    if (strcmp(protocol, "radius") == 0) {
+        return "./bin/radius_demo_client";
     }
     return NULL;
 }
@@ -1160,6 +1201,14 @@ static size_t build_protocol_envs(ChildEnv *envs, size_t cap) {
         envs[count++] = (ChildEnv){"UDP_SECURE_QUIC_ZERO_RTT", zero_rtt};
         envs[count++] = (ChildEnv){"UDP_SECURE_QUIC_WINDOW", "4"};
     }
+    /* Phase 2 protocols — scenario env flags follow UDP_SECURE_<PROTOCOL>_<KEY> pattern.
+       Most of the new protocols' C source reads the SCENARIO env directly via getenv,
+       so we only add scenario-specific overrides here when a protocol needs more than
+       the standard set. */
+    if (strcmp(state.experiment.protocol, "http2") == 0 && count + 1 <= cap) {
+        const char *force_cancel = strcmp(state.experiment.scenario, "stream-cancellation") == 0 ? "1" : "0";
+        envs[count++] = (ChildEnv){"UDP_SECURE_HTTP2_STREAM_CANCEL", force_cancel};
+    }
     return count;
 }
 
@@ -1167,7 +1216,7 @@ static void api_server_start(int fd, const char *body) {
     static char port[32], password[256], input[PATH_MAX], checked_input[PATH_MAX];
     static char protocol[64], scenario[64];
     char error[SMALL_BUF];
-    ChildEnv envs[16];
+    ChildEnv envs[24];
     const char *binary = NULL;
     char *args[] = {(char *)"", port, password, checked_input, NULL};
     int port_num = json_get_int(body, "port", 9000);
@@ -1205,7 +1254,7 @@ static void api_client_start(int fd, const char *body) {
     static char host[256], port[32], out[PATH_MAX], checked_out[PATH_MAX], pwd1[256], pwd2[256], pwd3[256], mode[32];
     static char protocol[64], scenario[64];
     char error[SMALL_BUF];
-    ChildEnv envs[16];
+    ChildEnv envs[24];
     const char *binary = NULL;
     char *args_compat[] = {(char *)"", host, port, pwd1, pwd2, pwd3, checked_out, NULL};
     char *args_interactive[] = {(char *)"", host, port, checked_out, NULL};
@@ -1374,6 +1423,12 @@ static void route_api(int fd, const char *method, const char *path, const char *
                   "{\"tests\":[\"first_password_ok\",\"second_password_ok\",\"third_password_ok\","
                   "\"three_passwords_wrong\",\"big_file_transfer\",\"reliable_basic\","
                   "\"reliable_loss_recovery\",\"reliable_reorder_recovery\",\"reliable_duplicate_recovery\","
+                  "\"dns_normal\",\"dns_spoofed_response\",\"dns_nxdomain\","
+                  "\"oauth2_auth_code\",\"oauth2_pkce\",\"oauth2_token_replay\","
+                  "\"mqtt_normal\",\"mqtt_qos2_replay\",\"mqtt_unauth_subscribe\","
+                  "\"http2_normal\",\"http2_multiplex\",\"http2_hpack_overflow\","
+                  "\"sip_register\",\"sip_invite_bye\",\"sip_no_sips_downgrade\","
+                  "\"radius_normal\",\"radius_shared_secret_leak\",\"radius_chap_vs_pap\",\"radius_replay_attack\","
                   "\"server_timeout\",\"missing_input\",\"sequence_error\"]}");
     } else if (strcmp(path, "/api/test/run") == 0 && strcmp(method, "POST") == 0) {
         api_run_tests(fd, body);

@@ -12,7 +12,13 @@ all: $(BIN_DIR)/server $(BIN_DIR)/client $(BIN_DIR)/control_server \
 	$(BIN_DIR)/tcp_server $(BIN_DIR)/tcp_client $(BIN_DIR)/tls_server $(BIN_DIR)/tls_client \
 	$(BIN_DIR)/http_demo_server $(BIN_DIR)/http_demo_client \
 	$(BIN_DIR)/websocket_demo_server $(BIN_DIR)/websocket_demo_client \
-	$(BIN_DIR)/quic_demo_server $(BIN_DIR)/quic_demo_client
+	$(BIN_DIR)/quic_demo_server $(BIN_DIR)/quic_demo_client \
+	$(BIN_DIR)/dns_demo_server $(BIN_DIR)/dns_demo_client \
+	$(BIN_DIR)/oauth2_demo_server $(BIN_DIR)/oauth2_demo_client \
+	$(BIN_DIR)/mqtt_demo_server $(BIN_DIR)/mqtt_demo_client \
+	$(BIN_DIR)/http2_demo_server $(BIN_DIR)/http2_demo_client \
+	$(BIN_DIR)/sip_demo_server $(BIN_DIR)/sip_demo_client \
+	$(BIN_DIR)/radius_demo_server $(BIN_DIR)/radius_demo_client
 
 test: all
 	./test/run_tests.sh
@@ -68,6 +74,42 @@ build/quic_demo_server.o: src/quic_demo_server.c include/demo_util.h include/pro
 build/quic_demo_client.o: src/quic_demo_client.c include/demo_util.h include/protocol.h include/sha1_util.h | build
 	$(CC) $(CFLAGS) -c $< -o $@
 
+build/dns_demo_server.o: src/dns_demo_server.c include/demo_util.h include/protocol.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/dns_demo_client.o: src/dns_demo_client.c include/demo_util.h include/protocol.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/oauth2_demo_server.o: src/oauth2_demo_server.c include/demo_util.h include/protocol.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/oauth2_demo_client.o: src/oauth2_demo_client.c include/demo_util.h include/protocol.h include/sha1_util.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/mqtt_demo_server.o: src/mqtt_demo_server.c include/demo_util.h include/protocol.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/mqtt_demo_client.o: src/mqtt_demo_client.c include/demo_util.h include/protocol.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/http2_demo_server.o: src/http2_demo_server.c include/demo_util.h include/protocol.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/http2_demo_client.o: src/http2_demo_client.c include/demo_util.h include/protocol.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/sip_demo_server.o: src/sip_demo_server.c include/demo_util.h include/protocol.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/sip_demo_client.o: src/sip_demo_client.c include/demo_util.h include/protocol.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/radius_demo_server.o: src/radius_demo_server.c include/demo_util.h include/protocol.h include/sha1_util.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/radius_demo_client.o: src/radius_demo_client.c include/demo_util.h include/protocol.h include/sha1_util.h | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BIN_DIR)/server: build/server.o $(COMMON_OBJS) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
@@ -105,6 +147,42 @@ $(BIN_DIR)/quic_demo_server: build/quic_demo_server.o $(DEMO_COMMON_OBJS) | $(BI
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(BIN_DIR)/quic_demo_client: build/quic_demo_client.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/dns_demo_server: build/dns_demo_server.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/dns_demo_client: build/dns_demo_client.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/oauth2_demo_server: build/oauth2_demo_server.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/oauth2_demo_client: build/oauth2_demo_client.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/mqtt_demo_server: build/mqtt_demo_server.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/mqtt_demo_client: build/mqtt_demo_client.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/http2_demo_server: build/http2_demo_server.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/http2_demo_client: build/http2_demo_client.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/sip_demo_server: build/sip_demo_server.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/sip_demo_client: build/sip_demo_client.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/radius_demo_server: build/radius_demo_server.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/radius_demo_client: build/radius_demo_client.o $(DEMO_COMMON_OBJS) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:

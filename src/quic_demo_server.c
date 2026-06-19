@@ -216,14 +216,26 @@ int main(int argc, char **argv) {
         logger_close(&logger);
         return 1;
     }
-    fp = fopen(input_path, "rb");
-    if (!fp) {
-        demo_finish(&logger, "ABORT", "input open failed");
-        logger_close(&logger);
-        return 1;
+    /* 用 stat 拿到文件总大小；stream-reorder 场景需要预读到 file_buf，普通场景
+       在下面 handshake 完成后重新 fopen 边读边发。file_len 始终保留真实文件大小——
+       不在预读阶段修改它（之前的版本会把 file_len 截短到 sizeof(file_buf)，
+       导致普通场景也只发 1200 字节）。 */
+    {
+        struct stat st_in;
+        file_len = (stat(input_path, &st_in) == 0) ? (size_t)st_in.st_size : 0;
     }
-    file_len = fread(file_buf, 1, sizeof(file_buf), fp);
-    fclose(fp);
+    if (file_len > 0 && file_len <= sizeof(file_buf)) {
+        /* 完整预读（仅当文件能放进 file_buf 时）—— stream-reorder 场景需要。
+           注意：file_len > sizeof(file_buf) 时保持真实大小不动——之前 bug 在这种情况
+           下也走 fread + 截短到 1200，导致普通场景下大文件只发 1200 字节。 */
+        FILE *rb = fopen(input_path, "rb");
+        if (rb) {
+            size_t n = fread(file_buf, 1, sizeof(file_buf), rb);
+            fclose(rb);
+            (void)n;
+        }
+    }
+    (void)fp;
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) {
         demo_finish(&logger, "ABORT", "socket failed");
@@ -320,30 +332,63 @@ int main(int argc, char **argv) {
                     return 1;
                 }
             } else {
-                QuicPacket stream;
-                memset(&stream, 0, sizeof(stream));
-                stream.type = QUIC_PKT_STREAM;
-                stream.connection_id = reply.connection_id;
-                stream.stream_id = 1;
-                stream.seq = 1;
-                stream.payload_len = (uint16_t)file_len;
-                memcpy(stream.payload, file_buf, file_len);
-                if (scenario && strcmp(scenario, "loss-recovery") == 0) {
-                    stream.retransmit_count = 1;
-                    {
-                        struct timespec pause_time;
-                        pause_time.tv_sec = 0;
-                        pause_time.tv_nsec = 150000000L;
-                        nanosleep(&pause_time, NULL);
-                    }
-                }
-                if (send_packet_logged(&logger, fd, &peer_addr, peer_text, &stream, "DATA_TRANSFER", "SEND_STREAM") != 0 ||
-                    await_ack(&logger, fd, &peer_addr, peer_text, 1) != 0) {
-                    demo_finish(&logger, "ABORT", "stream send failed");
+                /* 按 QUIC_MAX_PAYLOAD 把文件切成 N 个 STREAM 帧逐个发送并等待 ACK。
+                   stream_id 固定为 1，seq 从 1 递增；packet_uid 在 server/client 两端
+                   用 (type, stream_id, seq) 派生，两端一致 → 矩阵不会误判丢失。 */
+                uint16_t seq = 1;
+                size_t offset = 0;
+                FILE *stream_fp = fopen(input_path, "rb");
+                if (!stream_fp) {
+                    demo_finish(&logger, "ABORT", "input reopen failed");
                     close(fd);
                     logger_close(&logger);
                     return 1;
                 }
+                while (offset < file_len) {
+                    size_t chunk = file_len - offset;
+                    if (chunk > QUIC_MAX_PAYLOAD) {
+                        chunk = QUIC_MAX_PAYLOAD;
+                    }
+                    QuicPacket stream;
+                    memset(&stream, 0, sizeof(stream));
+                    stream.type = QUIC_PKT_STREAM;
+                    stream.connection_id = reply.connection_id;
+                    stream.stream_id = 1;
+                    stream.seq = seq;
+                    stream.payload_len = (uint16_t)chunk;
+                    /* 直接从 stream_fp 读出当前 chunk 到 stream.payload——
+                       旧版用 file_buf + offset 是错的，file_buf 只缓存了开头
+                       1200 字节（QUIC_MAX_PAYLOAD 容量），超过部分越界读取。 */
+                    size_t got = fread(stream.payload, 1, chunk, stream_fp);
+                    if (got != chunk) {
+                        demo_finish(&logger, "ABORT", "stream read short");
+                        fclose(stream_fp);
+                        close(fd);
+                        logger_close(&logger);
+                        return 1;
+                    }
+                    if (scenario && strcmp(scenario, "loss-recovery") == 0 && seq == 1) {
+                        stream.retransmit_count = 1;
+                        {
+                            struct timespec pause_time;
+                            pause_time.tv_sec = 0;
+                            pause_time.tv_nsec = 150000000L;
+                            nanosleep(&pause_time, NULL);
+                        }
+                    }
+                    if (send_packet_logged(&logger, fd, &peer_addr, peer_text, &stream, "DATA_TRANSFER", "SEND_STREAM") != 0 ||
+                        await_ack(&logger, fd, &peer_addr, peer_text, seq) != 0) {
+                        demo_finish(&logger, "ABORT", "stream send failed");
+                        fclose(stream_fp);
+                        close(fd);
+                        logger_close(&logger);
+                        return 1;
+                    }
+                    offset += chunk;
+                    seq += 1;
+                }
+                fclose(stream_fp);
+                stream_fp = NULL;
             }
             {
                 QuicPacket close_packet;

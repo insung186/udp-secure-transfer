@@ -290,6 +290,21 @@ int main(int argc, char **argv) {
         if (opcode == 0x1U) {
             fwrite(payload, 1, payload_len, out);
             fwrite("\n", 1, 1, out);
+        } else if (opcode == 0x8U) {
+            /* CLOSE 帧：服务端发出 → 客户端应该跳出 recv 循环并以 OK 退出。
+               旧版一直循环直到 recv() 收到 EOF 才 ABORT，对学生演示的"正常收尾"流程不友好。 */
+            LogEvent e;
+            demo_init_event(&e, "INFO", "WS_CLOSE_RECEIVED", "DATA_TRANSFER", "received close frame from server");
+            e.peer = peer_text;
+            e.packet_type = "CLOSE";
+            e.packet_code = 0x8U;
+            e.frame_type = "close";
+            logger_write(&logger, &e);
+            demo_finish(&logger, "OK", "websocket-basic flow completed");
+            fclose(out);
+            close(fd);
+            logger_close(&logger);
+            return 0;
         } else if (opcode == 0x9U) {
             if (scenario && strcmp(scenario, "ping-timeout") == 0) {
                 continue;

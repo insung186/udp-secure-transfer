@@ -127,11 +127,20 @@ static void log_http_packet(Logger *logger, const char *level, const char *event
     logger_write(logger, &e);
 }
 
+/* do_request 内部用 static 缓冲保存最近一次响应的 body 副本 + 长度。
+   因为 http_demo_client 整个流程是单线程顺序执行，不会有并发竞争；
+   /upload 的 caller 用这个副本跳过元数据前缀（"uploaded=ok&bytes=N|"）只取纯 body。 */
+static char g_last_resp_body[2048];
+static size_t g_last_resp_body_len = 0;
+
+/* write_body_to_output: 1 (默认) = 把响应 body 整体写到 out（每个 response 一行）。
+   /upload 的响应里我们要在 body 前部插入 "uploaded=ok&bytes=N|" 元数据前缀，
+   然后再回显真实 body——所以 upload caller 把它置 0，自己处理写入。*/
 static int do_request(Logger *logger, const char *host, uint16_t port, const char *peer_text,
                       const char *method, const char *path, const char *body,
                       const char *req_type, int req_code,
                       const char *resp_type, int resp_code,
-                      int expect_status, FILE *out) {
+                      int expect_status, FILE *out, int write_body_to_output) {
     char request[HTTP_BUF_CAP];
     char headers[128];
     uint8_t response[HTTP_BUF_CAP + 1];
@@ -165,7 +174,17 @@ static int do_request(Logger *logger, const char *host, uint16_t port, const cha
     log_http_packet(logger, status_code >= 400 ? "ERROR" : "INFO", "RECV_HTTP_RESPONSE", "HTTP_RESPONSE",
                     "http response received", peer_text, "Server -> Client", resp_type, resp_code,
                     NULL, path, status_code, headers, response, response_len);
-    if (out && resp_body_len > 0) {
+    /* 把响应 body 副本存到 static 缓冲，方便 caller（如 /upload）自己解析
+       "uploaded=ok&bytes=N|<pure body>" 这样的前缀。 */
+    g_last_resp_body_len = 0;
+    if (resp_body && resp_body_len > 0) {
+        size_t copy = resp_body_len < sizeof(g_last_resp_body) - 1
+                          ? resp_body_len : sizeof(g_last_resp_body) - 1;
+        memcpy(g_last_resp_body, resp_body, copy);
+        g_last_resp_body[copy] = '\0';
+        g_last_resp_body_len = copy;
+    }
+    if (write_body_to_output && out && resp_body_len > 0) {
         fwrite(resp_body, 1, resp_body_len, out);
         fwrite("\n", 1, 1, out);
     }
@@ -231,7 +250,7 @@ int main(int argc, char **argv) {
 
     if (scenario && strcmp(scenario, "bad-method") == 0) {
         rc = do_request(&logger, host, port, peer_text, "PUT", "/status", "",
-                        "STATUS_REQUEST", 30, "STATUS_RESPONSE", 31, 405, out);
+                        "STATUS_REQUEST", 30, "STATUS_RESPONSE", 31, 405, out, 1);
         demo_finish(&logger, rc == 0 ? "ABORT" : "ABORT", "http-basic bad-method scenario");
         fclose(out);
         logger_close(&logger);
@@ -239,7 +258,7 @@ int main(int argc, char **argv) {
     }
 
     if (do_request(&logger, host, port, peer_text, "GET", "/status", "",
-                   "STATUS_REQUEST", 30, "STATUS_RESPONSE", 31, 200, out) != 0) {
+                   "STATUS_REQUEST", 30, "STATUS_RESPONSE", 31, 200, out, 1) != 0) {
         demo_finish(&logger, "ABORT", "status request failed");
         fclose(out);
         logger_close(&logger);
@@ -250,7 +269,7 @@ int main(int argc, char **argv) {
              (scenario && strcmp(scenario, "bad-auth") == 0) ? "wrong" : (passwords[0] ? passwords[0] : "secret"));
     if (do_request(&logger, host, port, peer_text, "POST", "/auth", request_body,
                    "AUTH_REQUEST", 32, "AUTH_RESPONSE", 33,
-                   (scenario && strcmp(scenario, "bad-auth") == 0) ? 403 : 200, out) != 0) {
+                   (scenario && strcmp(scenario, "bad-auth") == 0) ? 403 : 200, out, 1) != 0) {
         demo_finish(&logger, "ABORT", "auth request failed");
         fclose(out);
         logger_close(&logger);
@@ -267,20 +286,47 @@ int main(int argc, char **argv) {
         memset(request_body, 'A', sizeof(request_body) - 1);
         request_body[sizeof(request_body) - 1] = '\0';
         rc = do_request(&logger, host, port, peer_text, "POST", "/upload", request_body,
-                        "UPLOAD_REQUEST", 34, "UPLOAD_RESPONSE", 35, 413, out);
+                        "UPLOAD_REQUEST", 34, "UPLOAD_RESPONSE", 35, 413, out, 1);
         demo_finish(&logger, "ABORT", "http-basic payload-too-large scenario");
         fclose(out);
         logger_close(&logger);
         return rc == 0 ? 1 : 1;
     }
 
-    snprintf(request_body, sizeof(request_body), "demo upload from %s", host);
+    /* /upload：构造一个固定模式的 256 字节 payload（"HTTP-...<seq>...HTTP-..."），
+       提交后让 server 原样回显到响应 body 里——output 文件最终包含这个 payload。
+       用固定模式而不是读 input_file，让 HTTP demo 不需要客户端再传 input file 参数。*/
+    const size_t upload_len = 256;
+    if (upload_len >= sizeof(request_body)) {
+        demo_finish(&logger, "ABORT", "request_body too small for upload");
+        fclose(out);
+        logger_close(&logger);
+        return 1;
+    }
+    for (size_t i = 0; i < upload_len; i++) {
+        request_body[i] = (i % 2 == 0) ? 'H' : 'T';
+    }
+    /* 加上 16 字节首尾标记，方便人眼确认 transfer 完整性 */
+    if (upload_len >= 32) {
+        memcpy(request_body, "HTTP-CLIENT-PAYLOAD:", 20);
+        memcpy(request_body + upload_len - 12, ":END-PAYLOAD", 12);
+    }
+    request_body[upload_len] = '\0';
     if (do_request(&logger, host, port, peer_text, "POST", "/upload", request_body,
-                   "UPLOAD_REQUEST", 34, "UPLOAD_RESPONSE", 35, 201, out) != 0) {
+                   "UPLOAD_REQUEST", 34, "UPLOAD_RESPONSE", 35, 201, out, 0) != 0) {
         demo_finish(&logger, "ABORT", "upload request failed");
         fclose(out);
         logger_close(&logger);
         return 1;
+    }
+    /* /upload 响应 body 格式："uploaded=ok&bytes=N|<echoed payload>"。
+       写回 output 时只取 '|' 之后的纯 payload（前面是元数据头）。*/
+    {
+        char *sep = strchr(g_last_resp_body, '|');
+        if (sep) {
+            fwrite(sep + 1, 1, strlen(sep + 1), out);
+            fwrite("\n", 1, 1, out);
+        }
     }
 
     demo_finish(&logger, "OK", "http-basic flow completed");

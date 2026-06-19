@@ -1,0 +1,9 @@
+{
+  "protocol": "radius",
+  "scenarios": [
+    {"id": "normal", "name": "PAP 认证通过", "description": "用户名 alice + 密码 secret，server 返回 Access-Accept。"},
+    {"id": "shared-secret-leak", "name": "共享密钥错误", "description": "NAS 与 server 共享密钥不一致，server 检测 authenticator 失败并 Reject。"},
+    {"id": "chap-vs-pap", "name": "PAP vs CHAP", "description": "对比 PAP 明文密码 vs CHAP 挑战-响应（HMAC-SHA1），演示 PAP 易嗅探。"},
+    {"id": "replay-attack", "name": "重放攻击", "description": "重发已接收的 Access-Request，server 检测到 authenticator 复用并警告。"}
+  ]
+}

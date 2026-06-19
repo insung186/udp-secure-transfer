@@ -1,0 +1,9 @@
+{
+  "protocol": "http2",
+  "scenarios": [
+    {"id": "normal", "name": "正常多路复用", "description": "单 TCP 连接上并发多个 stream（/index.css /style.css /script.js）。"},
+    {"id": "multiplex", "name": "并发 6 个 stream", "description": "客户端发 6 个并发 stream，服务端交错响应，演示多路复用时延优势。"},
+    {"id": "hpack-overflow", "name": "HPACK 错误", "description": "客户端发超长 header name，触发 server RST_STREAM COMPRESSION_ERROR。"},
+    {"id": "stream-cancellation", "name": "流中途取消", "description": "客户端中途发送 RST_STREAM 取消某 stream，server 停止该 stream。"}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "protocol": "dns",
+  "scenarios": [
+    {"id": "normal", "name": "正常查询", "description": "客户端查询 example.com A 记录，server 返回 1.2.3.4。"},
+    {"id": "spoofed-response", "name": "应答伪造", "description": "server 在收到 query 后立即发送 txid 匹配的伪造应答，演示应答伪造风险。"},
+    {"id": "nxdomain-redir", "name": "NXDOMAIN 重定向", "description": "查询未知域名，server 返回 NXDOMAIN，引导客户端到 fallback。"},
+    {"id": "doh-tls", "name": "DoH 加密查询", "description": "走 HTTP/1.1 over TCP 模拟 DoH，对比明文 UDP 与加密 wire 差异。"}
+  ]
+}

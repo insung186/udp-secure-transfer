@@ -202,7 +202,10 @@ int main(int argc, char **argv) {
     char peer_text[64];
     QuicPacket packet;
     uint32_t connection_id;
-    StreamChunk chunks[8];
+    /* STREAM 帧暂存数组：硬上限 256 帧，覆盖 256 * 1200 ≈ 300 KB 的输入文件，
+       远超教学 demo 的样本尺寸。旧版固定 8 帧，遇到 > 8 个 STREAM 的文件会
+       静默丢弃后续帧（chunk_count < 8 条件）→ 完整性校验必然失败。 */
+    StreamChunk chunks[256];
     size_t chunk_count = 0;
     FILE *out = NULL;
     char temp_path[512];

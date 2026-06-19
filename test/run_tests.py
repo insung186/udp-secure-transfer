@@ -585,6 +585,217 @@ def run_all():
         verify_output=True,
         require_log_text="ZERO_RTT_REPLAY_RISK",
     ))
+    # ===== Phase 2 protocols (DNS, OAuth2, MQTT, HTTP/2, SIP, RADIUS) =====
+    # DNS
+    tests.append(run_demo_pair(
+        "dns_normal",
+        "DNS 正常 A 查询",
+        "./bin/dns_demo_server",
+        "./bin/dns_demo_client",
+        small,
+        "dns.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "dns", "UDP_SECURE_SCENARIO": "normal"},
+    ))
+    tests.append(run_demo_pair(
+        "dns_spoofed_response",
+        "DNS 应答伪造告警",
+        "./bin/dns_demo_server",
+        "./bin/dns_demo_client",
+        small,
+        "dns-spoof.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "dns", "UDP_SECURE_SCENARIO": "spoofed-response"},
+        require_log_text="SPOOFED_RESPONSE_SENT",
+    ))
+    tests.append(run_demo_pair(
+        "dns_nxdomain",
+        "DNS NXDOMAIN 重定向",
+        "./bin/dns_demo_server",
+        "./bin/dns_demo_client",
+        small,
+        "dns-nx.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "dns", "UDP_SECURE_SCENARIO": "nxdomain-redir"},
+    ))
+    # OAuth 2.0
+    tests.append(run_demo_pair(
+        "oauth2_auth_code",
+        "OAuth 2.0 授权码流",
+        "./bin/oauth2_demo_server",
+        "./bin/oauth2_demo_client",
+        small,
+        "oauth2.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "oauth2", "UDP_SECURE_SCENARIO": "auth-code"},
+    ))
+    tests.append(run_demo_pair(
+        "oauth2_pkce",
+        "OAuth 2.0 PKCE 强制",
+        "./bin/oauth2_demo_server",
+        "./bin/oauth2_demo_client",
+        small,
+        "oauth2-pkce.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "oauth2", "UDP_SECURE_SCENARIO": "pkce"},
+    ))
+    tests.append(run_demo_pair(
+        "oauth2_token_replay",
+        "OAuth 2.0 Token 重放",
+        "./bin/oauth2_demo_server",
+        "./bin/oauth2_demo_client",
+        small,
+        "oauth2-replay.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "oauth2", "UDP_SECURE_SCENARIO": "token-replay"},
+        expect_ok=False,
+        require_log_text="REPLAY_DETECTED",
+    ))
+    # MQTT
+    tests.append(run_demo_pair(
+        "mqtt_normal",
+        "MQTT 正常 pub/sub",
+        "./bin/mqtt_demo_server",
+        "./bin/mqtt_demo_client",
+        small,
+        "mqtt.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "mqtt", "UDP_SECURE_SCENARIO": "normal"},
+    ))
+    tests.append(run_demo_pair(
+        "mqtt_qos2_replay",
+        "MQTT QoS 2 防重放",
+        "./bin/mqtt_demo_server",
+        "./bin/mqtt_demo_client",
+        small,
+        "mqtt-qos2.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "mqtt", "UDP_SECURE_SCENARIO": "qos2-replay"},
+        expect_ok=False,
+        require_log_text="QOS2_DUP_DETECTED",
+    ))
+    tests.append(run_demo_pair(
+        "mqtt_unauth_subscribe",
+        "MQTT 受限主题订阅",
+        "./bin/mqtt_demo_server",
+        "./bin/mqtt_demo_client",
+        small,
+        "mqtt-unauth.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "mqtt", "UDP_SECURE_SCENARIO": "unauth-subscribe"},
+        expect_ok=False,
+        require_log_text="SUBSCRIBE_DENIED",
+    ))
+    # HTTP/2
+    tests.append(run_demo_pair(
+        "http2_normal",
+        "HTTP/2 单连接多 stream",
+        "./bin/http2_demo_server",
+        "./bin/http2_demo_client",
+        small,
+        "http2.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "http2", "UDP_SECURE_SCENARIO": "normal"},
+    ))
+    tests.append(run_demo_pair(
+        "http2_multiplex",
+        "HTTP/2 6 路并发 stream",
+        "./bin/http2_demo_server",
+        "./bin/http2_demo_client",
+        small,
+        "http2-mux.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "http2", "UDP_SECURE_SCENARIO": "multiplex"},
+    ))
+    tests.append(run_demo_pair(
+        "http2_hpack_overflow",
+        "HTTP/2 HPACK 错误",
+        "./bin/http2_demo_server",
+        "./bin/http2_demo_client",
+        small,
+        "http2-hpack.out",
+        "tcp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "http2", "UDP_SECURE_SCENARIO": "hpack-overflow"},
+        expect_ok=False,
+        require_log_text="HPACK_DECODE_ERROR",
+    ))
+    # SIP
+    tests.append(run_demo_pair(
+        "sip_register",
+        "SIP 注册",
+        "./bin/sip_demo_server",
+        "./bin/sip_demo_client",
+        small,
+        "sip-reg.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "sip", "UDP_SECURE_SCENARIO": "register"},
+    ))
+    tests.append(run_demo_pair(
+        "sip_invite_bye",
+        "SIP INVITE 完整流程",
+        "./bin/sip_demo_server",
+        "./bin/sip_demo_client",
+        small,
+        "sip-invite.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "sip", "UDP_SECURE_SCENARIO": "invite-bye"},
+    ))
+    tests.append(run_demo_pair(
+        "sip_no_sips_downgrade",
+        "SIP SIPS 降级告警",
+        "./bin/sip_demo_server",
+        "./bin/sip_demo_client",
+        small,
+        "sip-sips.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "sip", "UDP_SECURE_SCENARIO": "no-sips-downgrade"},
+        require_log_text="SIPS_DOWNGRADE_DETECTED",
+    ))
+    # RADIUS
+    tests.append(run_demo_pair(
+        "radius_normal",
+        "RADIUS PAP 认证通过",
+        "./bin/radius_demo_server",
+        "./bin/radius_demo_client",
+        small,
+        "radius.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "radius", "UDP_SECURE_SCENARIO": "normal"},
+    ))
+    tests.append(run_demo_pair(
+        "radius_shared_secret_leak",
+        "RADIUS 共享密钥错误",
+        "./bin/radius_demo_server",
+        "./bin/radius_demo_client",
+        small,
+        "radius-secret.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "radius", "UDP_SECURE_SCENARIO": "shared-secret-leak"},
+        expect_ok=False,
+        require_log_text="AUTHENTICATOR_INVALID",
+    ))
+    tests.append(run_demo_pair(
+        "radius_chap_vs_pap",
+        "RADIUS CHAP 替代 PAP",
+        "./bin/radius_demo_server",
+        "./bin/radius_demo_client",
+        small,
+        "radius-chap.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "radius", "UDP_SECURE_SCENARIO": "chap-vs-pap"},
+    ))
+    tests.append(run_demo_pair(
+        "radius_replay_attack",
+        "RADIUS 重放检测",
+        "./bin/radius_demo_server",
+        "./bin/radius_demo_client",
+        small,
+        "radius-replay.out",
+        "udp",
+        env_overrides={"UDP_SECURE_PROTOCOL": "radius", "UDP_SECURE_SCENARIO": "replay-attack"},
+        expect_ok=False,
+        require_log_text="REPLAY_DETECTED",
+    ))
     tests.append(test_missing_input())
     tests.append(test_timeout())
     tests.append(test_malformed_packet(small))

@@ -1,0 +1,26 @@
+{
+  "id": "sip",
+  "name": "SIP",
+  "name_en": "SIP",
+  "version": "2",
+  "transport": "udp",
+  "summary": "教学版 SIP（Session Initiation Protocol）：VoIP 信令文本协议（类 HTTP），演示 INVITE/REGISTER 流程、Via 头校验、注册劫持与重放。",
+  "transferView": "transaction",
+  "sequenceStages": ["REGISTER", "100_TRYING", "180_RINGING", "200_OK", "INVITE", "ACK", "BYE", "407_AUTH"],
+  "packetTypes": [
+    {"code": 180, "name": "REGISTER"},
+    {"code": 181, "name": "INVITE"},
+    {"code": 182, "name": "ACK"},
+    {"code": 183, "name": "BYE"},
+    {"code": 184, "name": "100_TRYING"},
+    {"code": 185, "name": "180_RINGING"},
+    {"code": 186, "name": "200_OK"},
+    {"code": 187, "name": "407_AUTH"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "method", "call_id",
+    "from_tag", "to_tag", "status_code", "header_summary",
+    "payload_length", "bytes", "packet_uid", "wire_hex"
+  ]
+}

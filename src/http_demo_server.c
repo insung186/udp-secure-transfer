@@ -307,7 +307,7 @@ int main(int argc, char **argv) {
                 break;
             }
         } else if (strcmp(method, "POST") == 0 && strcmp(path, "/upload") == 0) {
-            char body_text[160];
+            char body_text[HTTP_UPLOAD_LIMIT + 64];
             if (!authed) {
                 send_http_response(&logger, fd, peer, 401, "Unauthorized", "auth required",
                                    resp_type, resp_code, "ABORT", "SEND_UPLOAD_UNAUTHORIZED");
@@ -320,7 +320,22 @@ int main(int argc, char **argv) {
                 close(fd);
                 break;
             }
-            snprintf(body_text, sizeof(body_text), "uploaded=%zu", body_len);
+            /* 把 body 内容回显到响应里——这样教学 demo 的 client 端会真的收到
+               upload 的内容（前 1KB 字节），写到 output 文件可以对比完整性。
+               同时也把 status 元数据放在响应的 header 里（X-Uploaded-Bytes）。 */
+            {
+                int n = snprintf(body_text, sizeof(body_text), "uploaded=ok&bytes=%zu|", body_len);
+                if (n > 0 && (size_t)n < sizeof(body_text) && body_len > 0) {
+                    size_t copy_len = body_len;
+                    if ((size_t)n + copy_len >= sizeof(body_text)) {
+                        copy_len = sizeof(body_text) - (size_t)n - 1;
+                    }
+                    memcpy(body_text + n, body, copy_len);
+                    body_text[n + copy_len] = '\0';
+                } else if (n > 0) {
+                    body_text[n] = '\0';
+                }
+            }
             if (send_http_response(&logger, fd, peer, 201, "Created", body_text,
                                    resp_type, resp_code, "DONE", "SEND_UPLOAD_OK") != 0) {
                 close(fd);

@@ -1,0 +1,9 @@
+{
+  "protocol": "sip",
+  "scenarios": [
+    {"id": "register", "name": "正常注册", "description": "客户端 REGISTER → 200 OK，模拟用户绑定到 registrar。"},
+    {"id": "invite-bye", "name": "INVITE 完整流程", "description": "INVITE → 100/180/200 → ACK → BYE → 200 完整会话生命周期。"},
+    {"id": "no-sips-downgrade", "name": "SIPS 降级", "description": "client 尝试 sips:// 但 server 强转为 sip:// (UDP)，告警降级。"},
+    {"id": "replay-invite", "name": "INVITE 重放", "description": "同一 Call-ID 收到第二次 INVITE，server 检测重放并警告。"}
+  ]
+}

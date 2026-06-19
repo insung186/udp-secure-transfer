@@ -51,7 +51,7 @@ static void build_frame_wire(uint16_t type, const uint8_t *payload, uint32_t pay
 static void log_frame(Logger *logger, const char *level, const char *event,
                       const char *state, const char *peer, uint16_t type,
                       const uint8_t *payload, uint32_t payload_len,
-                      const char *direction, int stream_offset) {
+                      const char *direction, int stream_offset, int logical_pid) {
     uint8_t wire[DEMO_MAX_FRAME];
     size_t wire_len = 0;
     char hex[DEMO_MAX_FRAME * 2 + 1];
@@ -68,35 +68,38 @@ static void log_frame(Logger *logger, const char *level, const char *event,
     e.direction = direction;
     e.stream_offset = stream_offset;
     if (type == DEMO_PKT_DATA || type == DEMO_PKT_APP_DATA) {
-        e.packet_id = stream_offset;
-        e.seq = stream_offset;
+        e.packet_id = logical_pid;
+        e.seq = logical_pid;
     }
     e.wire_hex = hex;
-    compute_packet_uid(uid, sizeof(uid), type, stream_offset, 0, wire, wire_len);
+    /* packet_uid：必须用 logical_pid 派生，server / client 两端才能算出相同 UID。 */
+    compute_packet_uid(uid, sizeof(uid), type, logical_pid >= 0 ? logical_pid : stream_offset, 0, wire, wire_len);
     e.packet_uid = uid;
     logger_write(logger, &e);
 }
 
 static int send_frame_logged(Logger *logger, int fd, const char *peer, uint16_t type,
                              const uint8_t *payload, uint32_t payload_len,
-                             const char *state, const char *event, int *stream_offset) {
+                             const char *state, const char *event, int *stream_offset,
+                             int logical_pid) {
     if (demo_send_frame(fd, type, payload, payload_len, 0) != 0) {
         return -1;
     }
     log_frame(logger, (type == DEMO_PKT_DATA || type == DEMO_PKT_APP_DATA) ? "DATA" : "INFO",
-              event, state, peer, type, payload, payload_len, "Client -> Server", *stream_offset);
+              event, state, peer, type, payload, payload_len, "Client -> Server", *stream_offset, logical_pid);
     *stream_offset += DEMO_HEADER_SIZE + (int)payload_len;
     return 0;
 }
 
 static int recv_frame_logged(Logger *logger, int fd, const char *peer, DemoFrame *frame,
-                             const char *state, const char *event, int *stream_offset) {
+                             const char *state, const char *event, int *stream_offset,
+                             int logical_pid) {
     if (demo_recv_frame(fd, frame) != 0) {
         return -1;
     }
     log_frame(logger, (frame->type == DEMO_PKT_DATA || frame->type == DEMO_PKT_APP_DATA) ? "DATA" : "INFO",
               event, state, peer, frame->type, frame->payload, frame->length,
-              "Server -> Client", *stream_offset);
+              "Server -> Client", *stream_offset, logical_pid);
     *stream_offset += DEMO_HEADER_SIZE + (int)frame->length;
     return 0;
 }
@@ -217,7 +220,7 @@ int main(int argc, char **argv) {
         e.port = (int)port;
         logger_write(&logger, &e);
     }
-    if (send_frame_logged(&logger, fd, peer_text, DEMO_PKT_JOIN_REQ, NULL, 0, "WAIT_PASS_REQ", "SEND_JOIN_REQ", &send_offset) != 0) {
+    if (send_frame_logged(&logger, fd, peer_text, DEMO_PKT_JOIN_REQ, NULL, 0, "WAIT_PASS_REQ", "SEND_JOIN_REQ", &send_offset, -1) != 0) {
         demo_finish(&logger, "ABORT", "failed to send JOIN_REQ");
         fclose(out);
         close(fd);
@@ -226,7 +229,7 @@ int main(int argc, char **argv) {
     }
     while (!stop_requested) {
         char password[PROTOCOL_MAX_PASSWORD + 1];
-        if (recv_frame_logged(&logger, fd, peer_text, &frame, "AUTH", "RECV_AUTH_PACKET", &recv_offset) != 0) {
+        if (recv_frame_logged(&logger, fd, peer_text, &frame, "AUTH", "RECV_AUTH_PACKET", &recv_offset, -1) != 0) {
             demo_finish(&logger, "ABORT", "authentication receive failed");
             fclose(out);
             remove(temp_path);
@@ -247,7 +250,7 @@ int main(int argc, char **argv) {
             snprintf(session_password, sizeof(session_password), "%s", password);
             if (send_frame_logged(&logger, fd, peer_text, DEMO_PKT_PASS_RESP,
                                   (const uint8_t *)password, (uint32_t)strlen(password),
-                                  "AUTH", "SEND_PASS_RESP", &send_offset) != 0) {
+                                  "AUTH", "SEND_PASS_RESP", &send_offset, -1) != 0) {
                 demo_finish(&logger, "ABORT", "failed to send PASS_RESP");
                 fclose(out);
                 remove(temp_path);
@@ -275,8 +278,8 @@ int main(int argc, char **argv) {
         uint32_t seen_seq = 0;
         demo_random_nonce(client_nonce, sizeof(client_nonce));
         if (send_frame_logged(&logger, fd, peer_text, DEMO_PKT_CLIENT_HELLO, client_nonce, sizeof(client_nonce),
-                              "HANDSHAKE", "SEND_CLIENT_HELLO", &send_offset) != 0 ||
-            recv_frame_logged(&logger, fd, peer_text, &frame, "HANDSHAKE", "RECV_SERVER_HELLO", &recv_offset) != 0 ||
+                              "HANDSHAKE", "SEND_CLIENT_HELLO", &send_offset, -1) != 0 ||
+            recv_frame_logged(&logger, fd, peer_text, &frame, "HANDSHAKE", "RECV_SERVER_HELLO", &recv_offset, -1) != 0 ||
             frame.type != DEMO_PKT_SERVER_HELLO || frame.length != sizeof(server_nonce)) {
             demo_finish(&logger, "ABORT", "tls-like hello failed");
             fclose(out);
@@ -291,8 +294,8 @@ int main(int argc, char **argv) {
         demo_hmac_sha1(session_key, sizeof(session_key),
                        (const uint8_t *)"client-finished", strlen("client-finished"), finished);
         if (send_frame_logged(&logger, fd, peer_text, DEMO_PKT_FINISHED, finished, sizeof(finished),
-                              "HANDSHAKE", "SEND_FINISHED", &send_offset) != 0 ||
-            recv_frame_logged(&logger, fd, peer_text, &frame, "HANDSHAKE", "RECV_FINISHED", &recv_offset) != 0 ||
+                              "HANDSHAKE", "SEND_FINISHED", &send_offset, -1) != 0 ||
+            recv_frame_logged(&logger, fd, peer_text, &frame, "HANDSHAKE", "RECV_FINISHED", &recv_offset, -1) != 0 ||
             frame.type != DEMO_PKT_FINISHED) {
             demo_finish(&logger, "ABORT", "tls-like finished failed");
             fclose(out);
@@ -334,8 +337,9 @@ int main(int argc, char **argv) {
             logger_close(&logger);
             return 1;
         }
+        int app_pid = 0;  /* 与 server 端的 app_pid 同步：从 0 开始计 logical APP_DATA id */
         while (!stop_requested) {
-            if (recv_frame_logged(&logger, fd, peer_text, &frame, "DATA_TRANSFER", "RECV_TRANSFER_PACKET", &recv_offset) != 0) {
+            if (recv_frame_logged(&logger, fd, peer_text, &frame, "DATA_TRANSFER", "RECV_TRANSFER_PACKET", &recv_offset, app_pid) != 0) {
                 demo_finish(&logger, "ABORT", "tls-like app data receive failed");
                 fclose(out);
                 remove(temp_path);
@@ -354,6 +358,7 @@ int main(int argc, char **argv) {
                 logger_close(&logger);
                 return 1;
             }
+            app_pid += 1;
             if (strcmp(getenv("UDP_SECURE_SCENARIO") ? getenv("UDP_SECURE_SCENARIO") : "", "replay") != 0) {
                 continue;
             }
@@ -392,8 +397,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    int data_pid = 0;  /* 与 server 端 chunks 同步：logical DATA 包序号 */
     while (!stop_requested) {
-        if (recv_frame_logged(&logger, fd, peer_text, &frame, "DATA_TRANSFER", "RECV_TRANSFER_PACKET", &recv_offset) != 0) {
+        if (recv_frame_logged(&logger, fd, peer_text, &frame, "DATA_TRANSFER", "RECV_TRANSFER_PACKET", &recv_offset, data_pid) != 0) {
             demo_finish(&logger, "ABORT", "tcp-basic receive failed");
             fclose(out);
             remove(temp_path);
@@ -410,6 +416,7 @@ int main(int argc, char **argv) {
                 logger_close(&logger);
                 return 1;
             }
+            data_pid += 1;
         } else if (frame.type == DEMO_PKT_TERMINATE) {
             uint8_t local_digest[SHA1_DIGEST_LENGTH];
             fclose(out);

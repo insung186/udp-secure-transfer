@@ -28,7 +28,7 @@
   --stage-auth: #7A5B8E;
   --stage-data: #5C8A6A;
   --stage-final: #B56A5A;
-  --success: #5C8A6A;
+  --success: #3F8E5C;  /* 比 #5C8A6A 饱和度更高，分片矩阵的"已收"格子更显眼 */
   --warning: #C49A4A;
   --danger: #A86666;  /* 比 #B55A5A 偏灰偏冷，避免在浅米色底上"跳"出粉红感 */
   --code-bg: #D6DBE3;
@@ -334,7 +334,7 @@
   --stage-auth: #5A6E7A;
   --stage-data: #7A99B5;
   --stage-final: #B5C4CE;
-  --success: #5C8A6A;
+  --success: #3F8E5C;  /* 比 #5C8A6A 饱和度更高 */
   --warning: #C49A4A;
   --danger: #8B6868;  /* 冷雾主题：偏灰偏冷，避免在浅灰底上像粉红警告色 */
   --code-bg: #DDE3E7;
@@ -522,7 +522,6 @@
   --stage-auth: #6B7A53;
   --stage-data: #A8B57A;
   --stage-final: #B84418;
-  --success: #7A9059;
   --warning: #C49A4A;
   --danger: #8B5A3A;  /* 抹茶：朱土色调去饱和度，避免在米黄底上跳出"红字警告"感 */
   --code-bg: #E0DFC8;
@@ -545,6 +544,7 @@
   --accent-1: #7A9059;
   --accent-2: #A8B57A;
   --stage-color: #7A9059;
+  --success: #4E8A3D;  /* 比 #7A9059 饱和度更高，分片矩阵"已收"更显眼 */
   --decor-blob-1: rgba(122, 144, 89, 0.12);
   --decor-blob-2: rgba(150, 165, 110, 0.10);
   --glow-primary: none;

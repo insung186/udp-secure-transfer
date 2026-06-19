@@ -1,0 +1,24 @@
+{
+  "id": "radius",
+  "name": "RADIUS",
+  "name_en": "RADIUS",
+  "version": "2",
+  "transport": "udp",
+  "summary": "教学版 RADIUS（Remote Authentication Dial-In User Service）：AAA 框架 UDP 协议，code+id+length+authenticator+attributes TLV，演示 PAP vs CHAP、共享密钥、重放检测。",
+  "transferView": "transaction",
+  "sequenceStages": ["ACCESS_REQUEST", "ACCESS_ACCEPT", "ACCESS_REJECT", "ACCOUNTING_REQUEST", "ACCOUNTING_RESPONSE"],
+  "packetTypes": [
+    {"code": 200, "name": "ACCESS_REQUEST"},
+    {"code": 201, "name": "ACCESS_ACCEPT"},
+    {"code": 202, "name": "ACCESS_REJECT"},
+    {"code": 203, "name": "ACCOUNTING_REQUEST"},
+    {"code": 204, "name": "ACCOUNTING_RESPONSE"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "radius_id",
+    "username", "auth_protocol", "payload_length", "bytes",
+    "security_mac_valid", "security_replay",
+    "packet_uid", "wire_hex"
+  ]
+}

@@ -256,6 +256,15 @@
             <span class="status-pill" id="phase-pill">阶段：INIT</span>
             <span class="status-pill result" id="result-pill">结果：等待</span>
           </div>
+          <div class="topbar-actions">
+            <button type="button" class="help-button" id="topbar-help-btn"
+                    aria-label="使用入门" data-i18n-aria-label="welcomeReopen"
+                    data-i18n-title="welcomeReopen"
+                    title="使用入门">
+              <span class="help-icon" aria-hidden="true">?</span>
+              <span class="help-label" data-i18n="welcomeReopen">入门</span>
+            </button>
+          </div>
         </header>
 
         <nav class="tabs" aria-label="Console tabs">
@@ -267,6 +276,21 @@
 
         <main>
         <section class="tab-panel is-active" id="tab-dashboard" aria-label="Dashboard">
+          <!-- 持久入门提示卡：用户关闭欢迎面板后，仍在 dashboard 顶部保留一个
+               可折叠的 3 步提示，避免"忘了怎么用"。可点 ✕ 永久折叠。-->
+          <details class="quickstart-banner" id="quickstart-banner" open>
+            <summary>
+              <span class="quickstart-badge" aria-hidden="true">3</span>
+              <span class="quickstart-title" data-i18n="quickstartTitle">3 步快速开始</span>
+              <span class="quickstart-toggle-hint" data-i18n="quickstartToggleHint">点击展开 / 收起</span>
+              <button type="button" class="quickstart-close" id="quickstart-close" aria-label="关闭">✕</button>
+            </summary>
+            <ol class="quickstart-steps">
+              <li><strong data-i18n="quickstartStep1Label">选协议</strong><span data-i18n="quickstartStep1Body">左侧「协议与场景」下拉框选协议与场景</span></li>
+              <li><strong data-i18n="quickstartStep2Label">启服务 → 启客户端</strong><span data-i18n="quickstartStep2Body">点左侧「启动服务端」「启动客户端」</span></li>
+              <li><strong data-i18n="quickstartStep3Label">看右侧</strong><span data-i18n="quickstartStep3Body">仪表盘 → 协议时序 → 传输矩阵 → 日志</span></li>
+            </ol>
+          </details>
           <div class="dashboard-grid">
             <section class="panel hero-panel">
               <header class="hero-summary">
@@ -449,18 +473,21 @@
                 <div class="matrix-summary" id="matrix-summary"></div>
               </div>
               <div class="matrix-toolbar">
-                <label class="matrix-toggle">
-                  <input type="checkbox" id="matrix-show-dup" checked>
-                  <span data-i18n="matrixShowDup">显示重复</span>
-                </label>
-                <label class="matrix-toggle">
-                  <input type="checkbox" id="matrix-show-gaps" checked>
-                  <span data-i18n="matrixShowGaps">标出缺口</span>
-                </label>
-                <label class="matrix-toggle">
-                  <input type="checkbox" id="matrix-show-time">
-                  <span data-i18n="matrixShowTime">显示时间带</span>
-                </label>
+                <div class="matrix-toolbar-row">
+                  <span class="matrix-toggle-group" data-i18n="matrixFilterGroup">显示</span>
+                  <label class="matrix-toggle">
+                    <input type="checkbox" id="matrix-show-dup" checked>
+                    <span data-i18n="matrixShowDup">重复</span>
+                  </label>
+                  <label class="matrix-toggle">
+                    <input type="checkbox" id="matrix-show-gaps" checked>
+                    <span data-i18n="matrixShowGaps">丢失</span>
+                  </label>
+                  <label class="matrix-toggle">
+                    <input type="checkbox" id="matrix-show-time">
+                    <span data-i18n="matrixShowTime">时间带</span>
+                  </label>
+                </div>
                 <div class="matrix-legend" id="matrix-legend"></div>
               </div>
               <div class="fragment-matrix" id="fragment-matrix"></div>
@@ -580,6 +607,76 @@
           </div>
         </section>
         </main>
+      </div>
+    </div>
+
+    <!-- 首次访问欢迎面板：localStorage 标记，仅首次显示；可点 ✕ 关闭或点"不再显示" -->
+    <div class="welcome-overlay" id="welcome-overlay" hidden>
+      <div class="welcome-card" role="dialog" aria-labelledby="welcome-title">
+        <button type="button" class="welcome-close" id="welcome-close" aria-label="关闭">✕</button>
+        <header class="welcome-header">
+          <p class="welcome-eyebrow" data-i18n="welcomeEyebrow">多协议教学演示平台</p>
+          <h2 id="welcome-title" data-i18n="welcomeTitle">欢迎：3 步跑通一个协议</h2>
+          <p class="welcome-subtitle" data-i18n="welcomeSubtitle">左侧选协议 → 启动服务端 → 启动客户端 → 看右侧日志/时序/矩阵。</p>
+        </header>
+
+        <ol class="welcome-steps">
+          <li class="welcome-step">
+            <span class="welcome-num">1</span>
+            <div class="welcome-step-body">
+              <h3 data-i18n="welcomeStep1Title">选协议 + 选场景</h3>
+              <p data-i18n="welcomeStep1Body">左侧边栏的「协议与场景」下拉框选目标协议和场景。下方面板选服务端/客户端的端口、密码、输入输出路径。</p>
+            </div>
+          </li>
+          <li class="welcome-step">
+            <span class="welcome-num">2</span>
+            <div class="welcome-step-body">
+              <h3 data-i18n="welcomeStep2Title">启动服务端 → 启动客户端</h3>
+              <p data-i18n="welcomeStep2Body">先点「启动服务端」建连接，再点「启动客户端」触发传输。中途切场景或场景异常可随时点「重置实验」清空。</p>
+            </div>
+          </li>
+          <li class="welcome-step">
+            <span class="welcome-num">3</span>
+            <div class="welcome-step-body">
+              <h3 data-i18n="welcomeStep3Title">看时序、看矩阵、看日志</h3>
+              <p data-i18n="welcomeStep3Body">右侧「协议」tab 看双向时序;「传输」tab 看分片矩阵 + 完整性;「日志」tab 看 WARN/ERROR 级安全事件。</p>
+            </div>
+          </li>
+        </ol>
+
+        <section class="welcome-tips">
+          <h3 data-i18n="welcomeTipsTitle">视图说明</h3>
+          <ul class="welcome-tip-list">
+            <li>
+              <span class="welcome-tag tag-file" data-i18n="welcomeTagFile">file</span>
+              <span data-i18n="welcomeTipFile">文件视图(UDP / TCP / TLS / QUIC):显示分片矩阵 + SHA1 摘要。</span>
+            </li>
+            <li>
+              <span class="welcome-tag tag-tx" data-i18n="welcomeTagTx">transaction</span>
+              <span data-i18n="welcomeTipTx">事务视图(HTTP / DNS / OAuth2 / HTTP2 / SIP / RADIUS):看请求/响应次数与状态码。</span>
+            </li>
+            <li>
+              <span class="welcome-tag tag-msg" data-i18n="welcomeTagMsg">message</span>
+              <span data-i18n="welcomeTipMsg">消息视图(WebSocket / MQTT):看 TEXT / PUBLISH 消息计数。</span>
+            </li>
+          </ul>
+        </section>
+
+        <footer class="welcome-footer">
+          <label class="welcome-dismiss" for="welcome-no-show">
+            <span class="welcome-dismiss-label">
+              <strong data-i18n="welcomeDismissTitle">记住我的选择</strong>
+              <span class="welcome-dismiss-hint" data-i18n="welcomeDismissHint">关闭后下次启动不再弹出，可随时从侧栏底部「查看入门指南」重新打开</span>
+            </span>
+            <span class="welcome-toggle">
+              <input type="checkbox" id="welcome-no-show" />
+              <span class="welcome-toggle-track" aria-hidden="true">
+                <span class="welcome-toggle-thumb"></span>
+              </span>
+            </span>
+          </label>
+          <button type="button" class="primary-button" id="welcome-got-it" data-i18n="welcomeGotIt">开始使用</button>
+        </footer>
       </div>
     </div>
 

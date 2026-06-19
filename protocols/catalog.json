@@ -1,9 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
   "protocols": [
     {
       "id": "udp-basic",
       "name": "UDP Basic",
+      "name_en": "UDP Basic",
       "transport": "udp",
       "schema": "/protocols/udp-basic/schema.json",
       "scenarios": "/protocols/udp-basic/scenarios.json",
@@ -12,6 +13,7 @@
     {
       "id": "udp-reliable",
       "name": "Reliable UDP",
+      "name_en": "Reliable UDP",
       "transport": "udp",
       "schema": "/protocols/udp-reliable/schema.json",
       "scenarios": "/protocols/udp-reliable/scenarios.json",
@@ -20,6 +22,7 @@
     {
       "id": "tcp-basic",
       "name": "TCP Basic",
+      "name_en": "TCP Basic",
       "transport": "tcp",
       "schema": "/protocols/tcp-basic/schema.json",
       "scenarios": "/protocols/tcp-basic/scenarios.json",
@@ -28,6 +31,7 @@
     {
       "id": "tls-like",
       "name": "TLS-like",
+      "name_en": "TLS-like",
       "transport": "tcp",
       "schema": "/protocols/tls-like/schema.json",
       "scenarios": "/protocols/tls-like/scenarios.json",
@@ -36,6 +40,7 @@
     {
       "id": "http-basic",
       "name": "HTTP Basic",
+      "name_en": "HTTP Basic",
       "transport": "tcp",
       "schema": "/protocols/http-basic/schema.json",
       "scenarios": "/protocols/http-basic/scenarios.json",
@@ -44,6 +49,7 @@
     {
       "id": "websocket-basic",
       "name": "WebSocket Basic",
+      "name_en": "WebSocket Basic",
       "transport": "tcp",
       "schema": "/protocols/websocket-basic/schema.json",
       "scenarios": "/protocols/websocket-basic/scenarios.json",
@@ -52,9 +58,64 @@
     {
       "id": "quic-like",
       "name": "QUIC-like",
+      "name_en": "QUIC-like",
       "transport": "udp",
       "schema": "/protocols/quic-like/schema.json",
       "scenarios": "/protocols/quic-like/scenarios.json",
+      "defaultScenario": "normal"
+    },
+    {
+      "id": "dns",
+      "name": "DNS",
+      "name_en": "DNS",
+      "transport": "udp",
+      "schema": "/protocols/dns/schema.json",
+      "scenarios": "/protocols/dns/scenarios.json",
+      "defaultScenario": "normal"
+    },
+    {
+      "id": "oauth2",
+      "name": "OAuth 2.0",
+      "name_en": "OAuth 2.0",
+      "transport": "tcp",
+      "schema": "/protocols/oauth2/schema.json",
+      "scenarios": "/protocols/oauth2/scenarios.json",
+      "defaultScenario": "auth-code"
+    },
+    {
+      "id": "mqtt",
+      "name": "MQTT",
+      "name_en": "MQTT",
+      "transport": "tcp",
+      "schema": "/protocols/mqtt/schema.json",
+      "scenarios": "/protocols/mqtt/scenarios.json",
+      "defaultScenario": "normal"
+    },
+    {
+      "id": "http2",
+      "name": "HTTP/2",
+      "name_en": "HTTP/2",
+      "transport": "tcp",
+      "schema": "/protocols/http2/schema.json",
+      "scenarios": "/protocols/http2/scenarios.json",
+      "defaultScenario": "normal"
+    },
+    {
+      "id": "sip",
+      "name": "SIP",
+      "name_en": "SIP",
+      "transport": "udp",
+      "schema": "/protocols/sip/schema.json",
+      "scenarios": "/protocols/sip/scenarios.json",
+      "defaultScenario": "register"
+    },
+    {
+      "id": "radius",
+      "name": "RADIUS",
+      "name_en": "RADIUS",
+      "transport": "udp",
+      "schema": "/protocols/radius/schema.json",
+      "scenarios": "/protocols/radius/scenarios.json",
       "defaultScenario": "normal"
     }
   ]

@@ -219,14 +219,15 @@ const i18n = {
     throughputWindow: "近 {seconds}s 窗口",
     throughputIdle: "等待数据流…",
     matrixSummary: "已收 {received} / 期望 {expected} · 丢失 {lost} · 重复 {dup} · 乱序 {oof}",
-    matrixShowDup: "显示重复",
-    matrixShowGaps: "标出缺口",
-    matrixShowTime: "显示时间带",
+    matrixFilterGroup: "过滤",
+    matrixShowDup: "重复",
+    matrixShowGaps: "丢失",
+    matrixShowTime: "时间带",
     legendReceived: "已收",
     legendLost: "丢失",
     legendDup: "重复",
     legendOof: "乱序",
-    legendPending: "未到",
+    legendPending: "未发",
     matrixIdle: "传输尚未开始。启动客户端后这里会显示 DATA 分片矩阵。",
     matrixAuthOnly: "认证阶段，尚未传输 DATA。",
     fragmentTooltip: "DATA #{id} · {bytes} · {time} · 距 {prev} {delta}",
@@ -387,6 +388,35 @@ const i18n = {
     outputPathRelativeOnly: "输出文件路径只支持相对路径。",
     serverStartFailed: "服务端启动失败。",
     clientStartFailed: "客户端启动失败。",
+    welcomeEyebrow: "多协议教学演示平台",
+    welcomeTitle: "欢迎：3 步跑通一个协议",
+    welcomeSubtitle: "左侧选协议 → 启动服务端 → 启动客户端 → 看右侧日志/时序/矩阵。",
+    welcomeStep1Title: "选协议 + 选场景",
+    welcomeStep1Body: "左侧边栏的「协议与场景」下拉框选目标协议和场景；下方面板选服务端/客户端的端口、密码、输入输出路径。",
+    welcomeStep2Title: "启动服务端 → 启动客户端",
+    welcomeStep2Body: "先点「启动服务端」建连接，再点「启动客户端」触发传输。中途切场景或场景异常可随时点「重置实验」清空。",
+    welcomeStep3Title: "看时序、看矩阵、看日志",
+    welcomeStep3Body: "右侧「协议」tab 看双向时序;「传输」tab 看分片矩阵 + 完整性;「日志」tab 看 WARN/ERROR 级安全事件。",
+    welcomeTipsTitle: "视图说明",
+    welcomeTagFile: "file",
+    welcomeTipFile: "文件视图(UDP / TCP / TLS / QUIC):显示分片矩阵 + SHA1 摘要。",
+    welcomeTagTx: "transaction",
+    welcomeTipTx: "事务视图(HTTP / DNS / OAuth2 / HTTP2 / SIP / RADIUS):看请求/响应次数与状态码。",
+    welcomeTagMsg: "message",
+    welcomeTipMsg: "消息视图(WebSocket / MQTT):看 TEXT / PUBLISH 消息计数。",
+    welcomeNoShow: "不再显示",
+    welcomeDismissTitle: "记住我的选择",
+    welcomeDismissHint: "关闭后下次启动不再弹出；可随时从侧栏底部「查看入门指南」重新打开",
+    welcomeGotIt: "开始使用",
+    welcomeReopen: "查看入门指南",
+    quickstartTitle: "3 步快速开始",
+    quickstartToggleHint: "点击展开 / 收起",
+    quickstartStep1Label: "选协议",
+    quickstartStep1Body: "左侧「协议与场景」下拉框选协议与场景",
+    quickstartStep2Label: "启服务 → 启客户端",
+    quickstartStep2Body: "点左侧「启动服务端」「启动客户端」",
+    quickstartStep3Label: "看右侧",
+    quickstartStep3Body: "仪表盘 → 协议时序 → 传输矩阵 → 日志",
   },
   en: {
     documentTitle: "Multi-Protocol Teaching Lab",
@@ -514,14 +544,15 @@ const i18n = {
     throughputWindow: "last {seconds}s window",
     throughputIdle: "Waiting for data…",
     matrixSummary: "Received {received} / Expected {expected} · Lost {lost} · Dup {dup} · OoO {oof}",
-    matrixShowDup: "Show duplicates",
-    matrixShowGaps: "Mark gaps",
-    matrixShowTime: "Show time band",
-    legendReceived: "received",
-    legendLost: "lost",
-    legendDup: "dup",
-    legendOof: "OoO",
-    legendPending: "pending",
+    matrixFilterGroup: "Filter",
+    matrixShowDup: "Dup",
+    matrixShowGaps: "Lost",
+    matrixShowTime: "Time band",
+    legendReceived: "Received",
+    legendLost: "Lost",
+    legendDup: "Duplicate",
+    legendOof: "Out-of-order",
+    legendPending: "Pending",
     matrixIdle: "Transfer not started. Cells will appear once the client sends DATA.",
     matrixAuthOnly: "Authentication phase, no DATA yet.",
     fragmentTooltip: "DATA #{id} · {bytes} · {time} · Δ {delta} from {prev}",
@@ -682,6 +713,35 @@ const i18n = {
     outputPathRelativeOnly: "Output file path must be relative.",
     serverStartFailed: "Server start failed.",
     clientStartFailed: "Client start failed.",
+    welcomeEyebrow: "Multi-Protocol Teaching Lab",
+    welcomeTitle: "Welcome: 3 steps to run a protocol",
+    welcomeSubtitle: "Pick a protocol → start server → start client → watch logs, sequence, and matrix on the right.",
+    welcomeStep1Title: "Pick protocol + scenario",
+    welcomeStep1Body: "Use the \"Protocol & scenario\" dropdowns in the left sidebar. Below them, set port, password, and input/output paths.",
+    welcomeStep2Title: "Start server, then client",
+    welcomeStep2Body: "Hit \"Start server\" first, then \"Start client\". You can switch scenarios or hit \"Reset run\" any time.",
+    welcomeStep3Title: "Read sequence, matrix, and logs",
+    welcomeStep3Body: "The Protocol tab shows the bidirectional sequence; the Transfer tab shows the fragment matrix + integrity; the Logs tab surfaces WARN/ERROR events.",
+    welcomeTipsTitle: "View cheat sheet",
+    welcomeTagFile: "file",
+    welcomeTipFile: "File view (UDP / TCP / TLS / QUIC): fragment matrix + SHA1 digest.",
+    welcomeTagTx: "transaction",
+    welcomeTipTx: "Transaction view (HTTP / DNS / OAuth2 / HTTP2 / SIP / RADIUS): request/response counts and status codes.",
+    welcomeTagMsg: "message",
+    welcomeTipMsg: "Message view (WebSocket / MQTT): TEXT / PUBLISH message counts.",
+    welcomeNoShow: "Don't show again",
+    welcomeDismissTitle: "Remember my choice",
+    welcomeDismissHint: "Skip this on next start; you can always reopen from \"Show guide\" at the bottom of the sidebar.",
+    welcomeGotIt: "Got it",
+    welcomeReopen: "Show getting-started guide",
+    quickstartTitle: "3-step quick start",
+    quickstartToggleHint: "Click to expand / collapse",
+    quickstartStep1Label: "Pick protocol",
+    quickstartStep1Body: "Use the sidebar's Protocol & scenario dropdowns",
+    quickstartStep2Label: "Start server → client",
+    quickstartStep2Body: "Click \"Start server\" then \"Start client\" in the sidebar",
+    quickstartStep3Label: "Watch right panel",
+    quickstartStep3Body: "Dashboard → Protocol sequence → Transfer matrix → Logs",
   },
 };
 
@@ -914,7 +974,11 @@ function currentProtocolDef() {
 
 function protocolDisplayName(protocolId) {
   const found = protocolOptions().find((item) => item.id === protocolId);
-  return found?.name || protocolId || "-";
+  if (!found) return protocolId || "-";
+  /* Bilingual: prefer name_en when language is English and the field exists,
+     else fall back to name (zh). */
+  if (appState.language === "en" && found.name_en) return found.name_en;
+  return found.name || protocolId || "-";
 }
 
 function currentScenarioList() {
@@ -980,15 +1044,27 @@ function flowTimelineEntries(flowPackets, protocolId) {
 }
 
 function uniqueTransferEntries(entries) {
-  const seen = new Set();
-  const unique = [];
+  /* 把同 packet_uid 的多次事件合并为 1 条：
+     - 关键：取 max(retransmit_count)。SEND_DATA 后跟 RETRANSMIT_DATA 时，后者
+       的 retransmit_count=1 不能被前者（0）覆盖，否则 oof/dup 视觉化会丢信息。
+     - 其它字段从首条复制（time / wire_hex 等同 packet_uid 下都相同）。
+     - 没有 packet_uid 的退化条目退回到 (packet_type:packet_id) 拼接做 key。 */
+  const map = new Map();
   for (const entry of entries) {
     const key = entry.packet_uid || `${entry.packet_type}:${entry.packet_id ?? entry.seq ?? entry.time ?? ""}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(entry);
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, entry);
+      continue;
+    }
+    /* 合并：保留更高的 retransmit_count / 重传标记 */
+    const prevRetrans = Number(prev.retransmit_count || 0);
+    const curRetrans = Number(entry.retransmit_count || 0);
+    if (curRetrans > prevRetrans) {
+      map.set(key, entry);
+    }
   }
-  return unique;
+  return Array.from(map.values());
 }
 
 function deriveFlowPhase(flowLogs, flowPackets, protocolId, result) {
@@ -999,10 +1075,14 @@ function deriveFlowPhase(flowLogs, flowPackets, protocolId, result) {
   if (packetNames.has("TERMINATE") || packetNames.has("CLOSE")) return "VERIFY";
   if (primaryRecv.length > 0) return "DATA_TRANSFER";
   if (["PASS_REQ", "PASS_RESP", "PASS_ACCEPT", "REJECT", "CLIENT_HELLO", "SERVER_HELLO", "FINISHED",
-       "AUTH_REQUEST", "AUTH_RESPONSE", "HANDSHAKE", "HANDSHAKE_ACK", "UPGRADE_REQUEST", "UPGRADE_RESPONSE"].some((name) => packetNames.has(name))) {
+       "AUTH_REQUEST", "AUTH_RESPONSE", "HANDSHAKE", "HANDSHAKE_ACK", "UPGRADE_REQUEST", "UPGRADE_RESPONSE",
+       /* Phase 2 protocols — handshake/auth/authz packet types */
+       "AUTHORIZE_REQUEST", "TOKEN_REQUEST", "RESOURCE_REQUEST", "REFRESH_REQUEST",
+       "DNS_QUERY", "ACCESS_REQUEST", "ACCOUNTING_REQUEST",
+       "REGISTER", "INVITE", "PREFACE", "SETTINGS"].some((name) => packetNames.has(name))) {
     return "AUTH";
   }
-  if (["JOIN_REQ", "INITIAL", "STATUS_REQUEST"].some((name) => packetNames.has(name))) {
+  if (["JOIN_REQ", "INITIAL", "STATUS_REQUEST", "CONNECT"].some((name) => packetNames.has(name))) {
     return "JOIN";
   }
   return "INIT";
@@ -1247,10 +1327,9 @@ function mergeLogs(entries) {
   // realPackets: 基于后端 packet_uid 去重后的真实包；同一 wire 包仅出现一次
   appState.realPackets = buildRealPackets(appState.allPackets);
   rebuildRealPacketsIndex();
-  // packets: 保留兼容旧引用；按 currentFlowId 过滤
-  appState.packets = appState.currentFlowId
-    ? appState.allPackets.filter((entry) => entry.flow_id === appState.currentFlowId)
-    : appState.allPackets;
+  // packets: 与 allPackets 相同——不做 flow 过滤。deriveRun / scopeRunToFlow
+  // 会按需 filter(flow_id === X)。这样 transfer tab 切到历史 flow 时不会丢包。
+  appState.packets = appState.allPackets;
   if (appState.selectedFlowId && !appState.packets.some((entry) => entry.flow_id === appState.selectedFlowId)) {
     appState.selectedFlowId = null;
     appState.selectedPacket = null;
@@ -1261,8 +1340,11 @@ function mergeLogs(entries) {
  * 基于后端 packet_uid 字段对包去重；同 wire 包在 client/server 两端产生相同 uid。
  * - 关键：去重 key 必须包含 flow_id；不同 run 相同输入会得到相同 packet_uid，
  *   若忽略 flow_id 就会把跨 run 的包错合并掉。
- * - 降级（无 packet_uid 的旧日志）：按 (flow_id, packet_type, packet_id, time_window)
- *   - 同一组内保留最早一条（通常是 SEND 端），并把其它端作为 `paired_logs` 备用
+ * - 降级（无 packet_uid 的旧日志）：按 (flow_id, packet_type, packet_id, time_window) 折叠。
+ * - canonical：每组保留首条 entry——用于时序图 / 包列表 / Inspector 等"按包展示"场景。
+ *   注意：deriveRun 自身的 dataSent / dataRecv 不依赖本函数的 canonical，
+ *   它从原始的 appState.packets 重新按 role 过滤，所以 wire-level duplicate
+ *   和 server 重传都不会被去重掉。
  */
 function buildRealPackets(allPackets) {
   const groups = new Map();
@@ -1278,10 +1360,7 @@ function buildRealPackets(allPackets) {
       groups.get(key).paired.push(entry);
     }
   }
-  return Array.from(groups.values()).map((g) => {
-    g.canonical.paired_logs = g.paired;
-    return g.canonical;
-  });
+  return Array.from(groups.values()).map((g) => g.canonical);
 }
 
 /* O(1) lookup table mapping realPackets entry -> index. Populated alongside
@@ -1334,6 +1413,10 @@ function deriveRun() {
     || appState.selectedProtocol;
   const dataRecv = flowTransferEntries(flowPackets, protocolId, "client");
   const dataSent = flowTransferEntries(flowPackets, protocolId, "server");
+  /* dataRecv / dataSent 保留 raw 形式（含 server 的 SEND + RETRANSMIT、
+     client 的多次 RECV 等），让 computeTransferStats 能正确统计 dupCount / oof。
+     dataRecvUnique / dataSentUnique 是按 packet_uid + max(retransmit_count)
+     折叠后的视图，用于 byte 合计和 set-based 比较（lost / sentIds）。 */
   const dataRecvUnique = uniqueTransferEntries(dataRecv);
   const dataSentUnique = uniqueTransferEntries(dataSent);
   const inputStart = flowLatest((entry) => entry.event === "SERVER_START");
@@ -1369,8 +1452,12 @@ function deriveRun() {
     serverDigest: serverDigest?.sha1 || "",
     clientDigest: clientDigest?.sha1 || "",
     digestMatch: Boolean(clientDigest && clientDigest.event === "DIGEST_MATCH"),
+    /* raw 视图（含 server 多次 SEND、client 多次 RECV），供 dupCount/oof 计算 */
     dataRecv,
     dataSent,
+    /* 去重视图（合并同 packet_uid 的多次发送/接收），供 byte / set 计算 */
+    dataRecvUnique,
+    dataSentUnique,
     receivedBytes,
     sentBytes,
     totalBytes,
@@ -1396,17 +1483,20 @@ function deriveRun() {
  *   - expectedCount = max(server SEND DATA packet_id) + 1（server 序号从 0 开始）
  *   - receivedSet  = client RECV DATA 的 packet_id 集合
  *   - lostIds      = expected 但未到达（server 发了但 client 没收到）
- *   - dupIds       = 同一 packet_id 收到多次（用 packet_uid 计数）
- *   - oofIds       = 到达时间晚于其后编号（视为乱序）
+ *   - dupIds       = 同一 packet_id 在客户端多次 RECV 的次数 - 1
+ *                    （用 RAW 视图，含 wire-level duplicate / 模拟重发）
+ *   - oofIds       = 到达顺序与 packet_id 顺序不一致（既标记"迟到"也标记"早到"）
  *   - pendingIds   = 在 [0, expected) 中、server 还没发的（多用于传输中）
- * 入参是 deriveRun() 返回值（含 dataRecv / dataSent）。
+ * 入参是 deriveRun() 返回值（含 dataRecv / dataSent 原始视图 + dataRecvUnique / dataSentUnique 去重视图）。
  */
 function computeTransferStats(run) {
   if ((run.transferView || protocolTransferView(run.protocol)) !== "file") {
+    const uniqueRecv = run.dataRecvUnique || run.dataRecv || [];
+    const uniqueSent = run.dataSentUnique || run.dataSent || [];
     return {
-      expectedCount: run.timelineEntries?.length || run.dataSent.length || 0,
-      receivedCount: run.dataRecv.length,
-      sentCount: run.dataSent.length,
+      expectedCount: run.timelineEntries?.length || uniqueSent.length || 0,
+      receivedCount: uniqueRecv.length,
+      sentCount: uniqueSent.length,
       lostCount: 0,
       dupCount: 0,
       oofCount: 0,
@@ -1418,18 +1508,23 @@ function computeTransferStats(run) {
       sentIds: new Set(),
     };
   }
+  /* sentIds 用 RAW 视图统计——server 故意重发的包也要算"发过"。 */
+  const sentRaw = run.dataSent || [];
   const sentIds = new Set();
   let maxSentId = -1;
-  for (const e of (run.dataSent || [])) {
+  for (const e of sentRaw) {
     const id = Number(e.packet_id || 0);
     sentIds.add(id);
     if (id > maxSentId) maxSentId = id;
   }
 
+  /* recvIds / recvCount 都基于 RAW——dupCount 必须基于 raw 才能
+     区分"wire-level 重发"和"第一次接收"。 */
+  const recvRaw = run.dataRecv || [];
   const recvIds = new Set();
   const recvCount = new Map();
   let maxRecvId = -1;
-  for (const e of (run.dataRecv || [])) {
+  for (const e of recvRaw) {
     const id = Number(e.packet_id || 0);
     recvIds.add(id);
     recvCount.set(id, (recvCount.get(id) || 0) + 1);
@@ -1454,23 +1549,44 @@ function computeTransferStats(run) {
     }
   }
 
-  /* 乱序判定：按到达时间遍历，如果当前 packet_id 小于已见最大值，
-     视为该包"迟到"——计为一次乱序。O(n) 一次扫描。 */
+  /* 乱序判定（对称版）：按到达时间遍历 packet_id 序列。
+     - 一对 (a, b) 若 id(a) > id(b) 且 a 先到 b 后到 → a 是"早到"，b 是"迟到"。
+     - 标记两者都 oof。
+     - 这样 [5, 0, 1, 2] 会把 5 和 1/2 都标为 oof（5 早到、1/2 迟到），
+       与 [0, 5, 1, 2] 只标 1/2 等价（5 早到仍然要被识别）。 */
   const oofIds = new Set();
-  const sortedRecv = [...(run.dataRecv || [])].sort(
+  /* 乱序判定（对称版）：按到达时间遍历。维护单调递减栈。
+     - 栈里 packet_id 严格递减。栈顶是"目前看到的最大 id"。
+     - 遇到新包 id=X 时，把栈顶 ≥ X 的都弹出。对每一对 (top, X)：
+         top 是"早到"（更高 id 先到了），X 是"迟到"（更低 id 后到），两侧都标 oof。
+     - 弹完之后 X 入栈。
+     - 循环结束时栈里剩下的项"永远没有更小的 id 来触发比较"——它们**没有证据**显示
+       顺序错乱，不能标 oof。例如：
+         * 只有一个包：栈=[{0}]，没有后续包来"证明"它早到，不标。
+         * 完全顺序到达 [0,1,2,...]：栈单调递增累积，全部不标。
+       早期版本在最后 drain 栈，错误地把这些标成 oof（单包场景 oof=1）。已修。 */
+  const sortedRecv = [...recvRaw].sort(
     (a, b) => logTimeMs(a) - logTimeMs(b)
   );
   let oofCount = 0;
-  let maxSoFar = -1;
+  /** @type {{id:number, entry:any}[]} */
+  const earlyStack = [];
   for (const e of sortedRecv) {
     const id = Number(e.packet_id || 0);
-    if (id < maxSoFar) {
-      oofCount += 1;
-      oofIds.add(id);
-    } else {
-      maxSoFar = id;
+    while (earlyStack.length && earlyStack[earlyStack.length - 1].id > id) {
+      const early = earlyStack.pop();
+      if (!oofIds.has(early.id)) {
+        oofIds.add(early.id);
+        oofCount += 1;
+      }
+      if (!oofIds.has(id)) {
+        oofIds.add(id);
+        oofCount += 1;
+      }
     }
+    earlyStack.push({id, entry: e});
   }
+  /* 故意不 drain earlyStack——剩余项没有"乱序证据"，保持不标。 */
 
   /* pending：server 还没发的（expectedCount 内、sentIds 没有的）。 */
   const pendingIds = new Set();
@@ -2004,9 +2120,156 @@ function renderDashboard(run) {
   renderLogList(byId("recent-logs"), flowLogs.slice(-8), true);
 }
 
+/* initWelcomeOverlay: 首次访问显示欢迎面板；localStorage 标记控制再显示。
+   - 默认情况下（localStorage 没有 dismissed 标记），首次刷新日志后展示
+   - 用户点 ✕ / "开始使用" / 勾选"不再显示"都会写入 localStorage
+   - 任何关闭方式都同步刷新 i18n 标签（语言切换后再次打开能正确显示）*/
+const WELCOME_DISMISS_KEY = "udpLabWelcomeDismissed";
+function initWelcomeOverlay() {
+  const overlay = byId("welcome-overlay");
+  if (!overlay) return;
+  const dismissCheckbox = byId("welcome-no-show");
+  const closeBtn = byId("welcome-close");
+  const gotItBtn = byId("welcome-got-it");
+  let dismissed = false;
+  try {
+    dismissed = localStorage.getItem(WELCOME_DISMISS_KEY) === "1";
+  } catch (error) {
+    console.warn(error);
+  }
+  /* 关闭逻辑：写入 localStorage（如勾选"不再显示"），隐藏 overlay */
+  const hideOverlay = () => {
+    overlay.hidden = true;
+    try {
+      if (dismissCheckbox && dismissCheckbox.checked) {
+        localStorage.setItem(WELCOME_DISMISS_KEY, "1");
+      }
+    } catch (error) {
+      console.warn(error);
+    }
+  };
+  if (closeBtn) closeBtn.addEventListener("click", hideOverlay);
+  if (gotItBtn) gotItBtn.addEventListener("click", hideOverlay);
+  /* 顶栏 "?" 按钮：随时调出完整欢迎面板（不写入 dismissed 标记） */
+  const reopenFn = () => {
+    overlay.hidden = false;
+    if (dismissCheckbox) dismissCheckbox.checked = false;
+    /* 让 data-i18n 文案按当前语言刷新 */
+    applyLanguage();
+  };
+  const topbarHelpBtn = byId("topbar-help-btn");
+  if (topbarHelpBtn) topbarHelpBtn.addEventListener("click", reopenFn);
+  /* dashboard quickstart banner：✕ 永久收起（记住状态），summary 仍可临时展开 */
+  const quickstartClose = byId("quickstart-close");
+  const quickstartBanner = byId("quickstart-banner");
+  if (quickstartClose && quickstartBanner) {
+    let qsDismissed = false;
+    try { qsDismissed = localStorage.getItem("udpLabQuickstartDismissed") === "1"; } catch (e) { /* ignore */ }
+    if (qsDismissed) quickstartBanner.open = false;
+    quickstartClose.addEventListener("click", (event) => {
+      /* 阻止冒泡到 summary（否则 summary 会切换 open 状态） */
+      event.preventDefault();
+      event.stopPropagation();
+      quickstartBanner.open = false;
+      try { localStorage.setItem("udpLabQuickstartDismissed", "1"); } catch (e) { /* ignore */ }
+    });
+  }
+  /* 点遮罩空白处也关闭（但不勾选"不再显示"） */
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) hideOverlay();
+  });
+  /* ESC 关闭 */
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !overlay.hidden) hideOverlay();
+  });
+  /* 仅在用户没有勾选过"不再显示"时展示 */
+  if (!dismissed) {
+    overlay.hidden = false;
+  }
+  /* 暴露一个全局打开函数：用户在 ?help=1 或顶栏"帮助"按钮可主动调 */
+  window.openWelcomeOverlay = () => {
+    overlay.hidden = false;
+    if (dismissCheckbox) dismissCheckbox.checked = false;
+    applyLanguage();
+  };
+  /* 语言切换时也同步刷新 welcome 里的 data-i18n 文案（render 整体刷新）*/
+  (function watchLanguage() {
+    const original = window.localStorage.getItem("udpLabLanguage");
+    let current = original || "zh";
+    setInterval(() => {
+      const next = localStorage.getItem("udpLabLanguage") || "zh";
+      if (next !== current) {
+        current = next;
+        /* 语言切换时重新 apply data-i18n 到所有元素 */
+        applyLanguage();
+      }
+    }, 500);
+  })();
+}
+
+/* renderProtocolSummaryCard: 关键设计是**避免用 innerHTML 重建整个 panel**，
+   因为 render() 每 250ms 被 refreshStatus 触发，会把整个 #protocol-summary-panel
+   的 children（包括 <select>）全部销毁重建，导致原生 <select> 的 dropdown 被强行关闭。
+
+   正确做法：
+   1. boot() 里 buildProtocolSummarySkeleton() 只调一次，建立稳定的 DOM 结构
+      （含 <select id="compare-protocol-select">），后续只更新 textContent
+   2. renderProtocolSummaryCard(run) 用 querySelector 拿已有元素，只改它们的 textContent/options
+   3. <select> 元素身份全程保持不变，dropdown 可以正常打开
+*/
+let _protoSummaryBuilt = false;
+let _protoSummaryLang = null;
+function buildProtocolSummarySkeleton() {
+  const node = byId("protocol-summary-panel");
+  if (!node) return;
+  /* 语言切换时需要重建 skeleton，让面板里硬编码的中文标签走新的文本*/
+  if (_protoSummaryBuilt && _protoSummaryLang === appState.language) return;
+  _protoSummaryBuilt = true;
+  _protoSummaryLang = appState.language;
+  node.innerHTML = `
+    <div class="panel-head">
+      <h2 class="proto-summary-title"></h2>
+      <span class="hint proto-summary-hint"></span>
+    </div>
+    <div class="metric-grid protocol-summary-grid">
+      <div class="metric"><span class="proto-protocol-label"></span><strong class="proto-protocol-name"></strong></div>
+      <div class="metric"><span class="proto-scenario-label"></span><strong class="proto-scenario-name"></strong></div>
+    </div>
+    <div class="protocol-stage-line">
+      <span class="proto-sequence-label"></span><code class="proto-sequence-value"></code>
+    </div>
+    <div class="protocol-compare-row">
+      <label>
+        <span class="label-text proto-compare-label"></span>
+        <select id="compare-protocol-select"></select>
+      </label>
+      <div class="protocol-compare-card">
+        <strong class="proto-compare-name"></strong>
+        <code class="proto-compare-stages"></code>
+      </div>
+    </div>
+  `;
+  /* 绑定 select 的 onchange 一次，跨多次 render 复用 */
+  const select = byId("compare-protocol-select");
+  if (select) {
+    select.addEventListener("change", (event) => {
+      const newId = event.currentTarget.value || appState.selectedProtocol;
+      appState.compareProtocol = newId;
+      /* 只更新 compare card 的内容；select 自己保持不变 */
+      const newCompare = protocolOptions().find((item) => item.id === newId) || null;
+      const newStages = newCompare ? (protocolSchema(newCompare.id).sequenceStages || []).join(" -> ") : "";
+      const nameEl = node.querySelector(".proto-compare-name");
+      const stagesEl = node.querySelector(".proto-compare-stages");
+      if (nameEl) nameEl.textContent = newCompare ? (newCompare.name || newCompare.id) : "";
+      if (stagesEl) stagesEl.textContent = newStages || "-";
+    });
+  }
+}
+
 function renderProtocolSummaryCard(run) {
   const node = byId("protocol-summary-panel");
   if (!node) return;
+  buildProtocolSummarySkeleton();
   const currentId = run.protocol || appState.selectedProtocol;
   const current = protocolOptions().find((item) => item.id === currentId) || currentProtocolDef();
   const compareOptions = protocolOptions().filter((item) => item.id !== currentId);
@@ -2014,42 +2277,60 @@ function renderProtocolSummaryCard(run) {
     appState.compareProtocol = compareOptions[0]?.id || currentId;
   }
   const compare = protocolOptions().find((item) => item.id === appState.compareProtocol) || null;
-  const currentStages = (protocolSchema(currentId).sequenceStages || []).join(" -> ");
-  const compareStages = compare ? (protocolSchema(compare.id).sequenceStages || []).join(" -> ") : "";
-  node.innerHTML = `
-    <div class="panel-head">
-      <h2>${escapeHtml(appState.language === "zh" ? "当前协议摘要" : "Protocol summary")}</h2>
-      <span class="hint">${escapeHtml(appState.language === "zh" ? "协议画像" : "Profile")}</span>
-    </div>
-    <div class="metric-grid protocol-summary-grid">
-      <div class="metric"><span>${t("protocolLabel")}</span><strong>${escapeHtml(current?.name || currentId)}</strong></div>
-      <div class="metric"><span>${t("scenarioLabel")}</span><strong>${escapeHtml(scenarioDisplayName(run.scenario || appState.selectedScenario, currentId))}</strong></div>
-    </div>
-    <div class="protocol-stage-line"><span>${escapeHtml(appState.language === "zh" ? "时序阶段" : "Sequence")}</span><code>${escapeHtml(currentStages || "-")}</code></div>
-    <div class="protocol-compare-row">
-      <label>
-        <span class="label-text">${escapeHtml(appState.language === "zh" ? "对比协议" : "Compare protocol")}</span>
-        <select id="compare-protocol-select">
-          ${compareOptions.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name || item.id)}</option>`).join("")}
-        </select>
-      </label>
-      ${compare ? `<div class="protocol-compare-card">
-        <strong>${escapeHtml(compare.name || compare.id)}</strong>
-        <code>${escapeHtml(compareStages || "-")}</code>
-      </div>` : ""}
-    </div>
-  `;
+  const lang = appState.language;
+
+  /* 直接更新 textContent，不重建 DOM。textContent 不会触发重排破坏 dropdown。*/
+  const setText = (selector, value) => {
+    const el = node.querySelector(selector);
+    if (el) el.textContent = value;
+  };
+  setText(".proto-summary-title", lang === "zh" ? "当前协议摘要" : "Protocol summary");
+  setText(".proto-summary-hint", lang === "zh" ? "协议画像" : "Profile");
+  setText(".proto-protocol-label", t("protocolLabel"));
+  setText(".proto-protocol-name", current?.name || currentId);
+  setText(".proto-scenario-label", t("scenarioLabel"));
+  setText(".proto-scenario-name", scenarioDisplayName(run.scenario || appState.selectedScenario, currentId));
+  setText(".proto-sequence-label", lang === "zh" ? "时序阶段" : "Sequence");
+  setText(".proto-sequence-value", (protocolSchema(currentId).sequenceStages || []).join(" -> ") || "-");
+  setText(".proto-compare-label", lang === "zh" ? "对比协议" : "Compare protocol");
+  setText(".proto-compare-name", compare ? (compare.name || compare.id) : "");
+  setText(".proto-compare-stages", compare ? ((protocolSchema(compare.id).sequenceStages || []).join(" -> ") || "-") : "");
+
+  /* 更新 select 的 options 和 value（不替换 select 元素本身） */
   const select = byId("compare-protocol-select");
   if (select) {
-    select.value = appState.compareProtocol;
-    select.onchange = (event) => {
-      appState.compareProtocol = event.currentTarget.value || currentId;
-      renderProtocolSummaryCard(run);
-    };
+    /* 检测 options 是否需要重建：currentId 变化 / 语言变化 / options 数量变化时重建 */
+    const currentOptsKey = select.dataset.optsKey || "";
+    const newOptsKey = currentId + ":" + compareOptions.length + ":" + lang;
+    if (currentOptsKey !== newOptsKey) {
+      /* 重建 options：用 DocumentFragment 一次性插入，避免多次重排 */
+      const frag = document.createDocumentFragment();
+      compareOptions.forEach((item) => {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.textContent = protocolDisplayName(item.id);
+        frag.appendChild(opt);
+      });
+      /* 清空 select 并替换 options */
+      select.innerHTML = "";
+      select.appendChild(frag);
+      select.dataset.optsKey = newOptsKey;
+    }
+    /* 同步 value */
+    if (select.value !== appState.compareProtocol) {
+      select.value = appState.compareProtocol;
+    }
   }
 }
 
 function digestMarkup(run, title) {
+  const view = run.transferView || protocolTransferView(run.protocol);
+  /* transaction/message 类协议不发 DIGEST 事件，digestMarkup 显示"等待"会让用户误以为有 bug。
+     针对不同视图返回更准确的"完整性"语义。 */
+  if (view !== "file") {
+    const alt = altIntegrityFor(run, view);
+    if (alt) return renderIntegrityLines(alt, /* includePanelHead */ true, /* overrideTitle */ title);
+  }
   const state = run.clientDigest ? (run.digestMatch ? t("digestMatch") : t("digestMismatch")) : t("waiting");
   const badgeClass = run.digestMatch ? "success" : run.clientDigest ? "danger" : "";
   return `
@@ -2060,6 +2341,98 @@ function digestMarkup(run, title) {
       <div class="digest-line"><span>${t("result")}</span><code>${escapeHtml(resultLabel(run.result))}</code></div>
     </div>
   `;
+}
+
+/* altIntegrityFor: 当协议是 transaction/message 视图时，
+   把"完整性校验"换成对该协议更合适的语义：
+   - transaction (HTTP / DNS / OAuth2 / HTTP2 / SIP / RADIUS):
+     统计 client 收到的 *_RESPONSE 包，按 status_code 区分成功 / 失败。
+   - message (WebSocket / MQTT):
+     统计 client 端 TEXT/PUBLISH/PING/PONG 消息数。*/
+function altIntegrityFor(run, view) {
+  const flowId = appState.currentFlowId;
+  const lang = appState.language;
+  if (view === "transaction") {
+    const responses = appState.packets.filter((e) =>
+      (!flowId || e.flow_id === flowId) &&
+      e.role === "client" &&
+      /_RESPONSE$/.test(String(e.packet_type || "")) &&
+      Number(e.status_code) > 0
+    );
+    if (responses.length === 0) {
+      return {
+        state: t("waiting"),
+        badge: "",
+        panelTitle: lang === "zh" ? "事务摘要" : "Transaction summary",
+        lines: [
+          { label: lang === "zh" ? "说明" : "Note",
+            value: lang === "zh" ? "该协议采用事务视图，不走文件 SHA1 摘要" : "Transaction view: no file digest" },
+        ],
+        resultLabel: null,
+      };
+    }
+    const ok = responses.filter((e) => {
+      const s = Number(e.status_code);
+      return s >= 200 && s < 400;
+    }).length;
+    const fail = responses.filter((e) => Number(e.status_code) >= 400).length;
+    const lastStatus = Number(responses[responses.length - 1].status_code) || 0;
+    const match = fail === 0 && ok > 0;
+    const state = match ? (lang === "zh" ? "请求成功" : "Requests OK")
+                       : fail > 0 ? (lang === "zh" ? "存在失败响应" : "Some requests failed")
+                                  : t("waiting");
+    return {
+      state,
+      badge: match ? "success" : fail > 0 ? "danger" : "",
+      panelTitle: lang === "zh" ? "事务摘要" : "Transaction summary",
+      lines: [
+        { label: lang === "zh" ? "成功响应" : "Successful", value: String(ok) },
+        { label: lang === "zh" ? "失败响应" : "Failed", value: String(fail) },
+        { label: lang === "zh" ? "最后状态码" : "Last status", value: String(lastStatus) },
+      ],
+      resultLabel: resultLabel(run.result),
+    };
+  }
+  if (view === "message") {
+    const messages = appState.packets.filter((e) =>
+      (!flowId || e.flow_id === flowId) &&
+      e.role === "client" &&
+      ["TEXT", "PUBLISH", "PING", "PONG"].includes(String(e.packet_type || ""))
+    );
+    const hasData = messages.length > 0;
+    const state = hasData
+      ? (lang === "zh" ? "消息收发完成" : "Messages exchanged")
+      : t("waiting");
+    return {
+      state,
+      badge: hasData ? "success" : "",
+      panelTitle: lang === "zh" ? "消息摘要" : "Message summary",
+      lines: [
+        { label: lang === "zh" ? "消息条数" : "Messages", value: String(messages.length) },
+      ],
+      resultLabel: resultLabel(run.result),
+    };
+  }
+  return null;
+}
+
+/* 把 altIntegrityFor 的结构化结果拼成 HTML 片段。
+   includePanelHead=true 时带 <div class="panel-head">（digestMarkup 用）；
+   overrideTitle 非空时覆盖 panelTitle（digestMarkup 传 "sha1Digest"）。
+   renderIntegrity 走 includePanelHead=false，自己外层已经有 panel-head。*/
+function renderIntegrityLines(alt, includePanelHead, overrideTitle) {
+  if (!alt) return "";
+  const title = overrideTitle || alt.panelTitle;
+  const head = includePanelHead
+    ? `<div class="panel-head"><h2>${escapeHtml(title)}</h2><span class="badge ${escapeHtml(alt.badge)}">${escapeHtml(alt.state)}</span></div>`
+    : "";
+  const lines = alt.lines.map((ln) =>
+    `<div class="digest-line"><span>${escapeHtml(ln.label)}</span><code>${escapeHtml(ln.value)}</code></div>`
+  ).join("");
+  const resultLine = alt.resultLabel
+    ? `<div class="digest-line"><span>${escapeHtml(t("result"))}</span><code>${escapeHtml(alt.resultLabel)}</code></div>`
+    : "";
+  return `${head}<div class="digest-lines">${lines}${resultLine}</div>`;
 }
 
 function renderConfig(run) {
@@ -2454,61 +2827,9 @@ function renderTransfer(run) {
    进而 progress = 0、lostCount = expectedCount）。*/
 function scopeRunToFlow(run, flowId) {
   if (!flowId || run.flowId === flowId) return run;
-  const flowLogs = appState.logs.filter((e) => e.flow_id === flowId);
-  /* 关键：用 allPackets，保留 client / server 两端记录。*/
-  const flowPackets = appState.allPackets.filter((e) => e.flow_id === flowId);
-  const protocolId = [...flowLogs].reverse().find((e) => e.protocol)?.protocol || run.protocol || appState.selectedProtocol;
-  const dataRecv = flowTransferEntries(flowPackets, protocolId, "client");
-  const dataSent = flowTransferEntries(flowPackets, protocolId, "server");
-  const receivedBytes = uniqueTransferEntries(dataRecv).reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
-  const sentBytes = uniqueTransferEntries(dataSent).reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
-  const finalEvent = [...flowLogs].reverse().find(
-    (e) => e.event === "FINAL_OK" || e.event === "FINAL_ABORT"
-  );
-  let result = finalEvent
-    ? (finalEvent.result || (finalEvent.event === "FINAL_OK" ? "OK" : "ABORT"))
-    : "Pending";
-  const inputStart = [...flowLogs].reverse().find((e) => e.event === "SERVER_START");
-  const totalBytes = protocolTransferView(protocolId) === "file"
-    ? Number(inputStart?.bytes || Math.max(receivedBytes, sentBytes, 0))
-    : Math.max(receivedBytes, sentBytes, 0);
-  const progress = totalBytes > 0
-    ? Math.min(100, Math.round((receivedBytes / totalBytes) * 100))
-    : (result === "OK" ? 100 : 0);
-  const firstData = dataRecv[0];
-  const lastData = dataRecv[dataRecv.length - 1];
-  let throughput = 0;
-  if (firstData && lastData) {
-    const start = new Date(firstData.time).getTime();
-    const end = new Date(lastData.time).getTime();
-    throughput = receivedBytes / Math.max(1, end - start) * 1000;
-  }
-  const phase = deriveFlowPhase(flowLogs, flowPackets, protocolId, result);
-  const attempts = Math.max(0, ...flowLogs.map((e) => Number(e.attempt || 0)));
-  const serverDigest = [...flowLogs].reverse().find((e) => e.event === "SERVER_DIGEST" && e.sha1);
-  const clientDigest = [...flowLogs].reverse().find(
-    (e) => (e.event === "DIGEST_MATCH" || e.event === "DIGEST_MISMATCH") && e.sha1
-  );
-  return {
-    ...run,
-    flowId,
-    result,
-    phase,
-    attempts,
-    progress,
-    totalBytes,
-    receivedBytes,
-    sentBytes,
-    dataRecv,
-    dataSent,
-    throughput,
-    serverDigest: serverDigest?.sha1 || "",
-    clientDigest: clientDigest?.sha1 || "",
-    digestMatch: Boolean(clientDigest && clientDigest.event === "DIGEST_MATCH"),
-    protocol: protocolId,
-    transferView: protocolTransferView(protocolId),
-    timelineEntries: flowTimelineEntries(flowPackets, protocolId),
-  };
+  /* 简单代理：deriveRun 现在基于未过滤的 appState.packets，所以直接以目标 flowId
+     重新计算 run，避免重复统计逻辑。返回的对象结构与 run 一致。 */
+  return deriveRun({flowId});
 }
 
 /* 1. Hero: 上下文 + Flow 选择器 */
@@ -2652,6 +2973,21 @@ function renderProgress(run, stats) {
     if (sec > 0 && sec < 9999) eta = t("etaSuffix", {seconds: `${sec}s`});
   }
 
+  /* 当前 flow 已用时间 */
+  let elapsed = "—";
+  const flowLogs = appState.logs.filter((e) => e.flow_id === appState.currentFlowId);
+  if (flowLogs.length >= 2) {
+    const firstTime = flowLogs[0]?.time;
+    const lastTime = flowLogs[flowLogs.length - 1]?.time;
+    if (firstTime && lastTime) {
+      const ms = new Date(lastTime).getTime() - new Date(firstTime).getTime();
+      elapsed = ms > 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms} ms`;
+    }
+  }
+  /* 吞吐率（B/s）—file 视图里 fileBytes 在持续累加，配合 elapsed 可算平均速率。
+     这里展示瞬时速率，与 throughput 面板里的"当前速率"互补。*/
+  const throughputNow = run.throughput ? formatBytes(Math.round(run.throughput)) : "—";
+
   const statsNode = byId("transfer-stats");
   if (!statsNode) return;
   if ((run.transferView || protocolTransferView(run.protocol)) !== "file") {
@@ -2665,24 +3001,31 @@ function renderProgress(run, stats) {
     `;
     return;
   }
+  /* file 视图：聚焦"传输进度"维度（%/字节/包/吞吐/ETA/已用时间）。
+     **完整性维度（lost/dup/oof/pending）已迁到 fragment-matrix 的 summary pills + legend，
+     这里不再重复展示**——避免双重计数 + 让两个 panel 职责清晰。*/
+  const elapsedLabel = appState.language === "zh" ? "已用时间" : "Elapsed";
+  const throughputLabel = appState.language === "zh" ? "瞬时速率" : "Throughput";
   statsNode.innerHTML = `
     <div class="metric"><span>${t("progress")}</span><strong>${run.progress}%</strong></div>
     <div class="metric"><span>${t("received")}</span><strong>${formatBytes(run.receivedBytes)} / ${formatBytes(run.totalBytes)}</strong></div>
     <div class="metric"><span>${t("sent")}</span><strong>${formatBytes(run.sentBytes)}</strong></div>
     <div class="metric"><span>${t("dataPackets")}</span><strong>${run.dataRecv.length}${run.dataSent.length ? ` / ${run.dataSent.length}` : ""}</strong></div>
+    <div class="metric"><span>${throughputLabel}</span><strong>${escapeHtml(throughputNow)}/s</strong></div>
     <div class="metric eta-metric"><span>${t("etaLabel")}</span><strong>${escapeHtml(eta)}</strong></div>
-    <div class="metric loss-metric"><span>${t("legendLost")}</span><strong>${stats.lostCount}</strong></div>
-    <div class="metric dup-metric"><span>${t("legendDup")}</span><strong>${stats.dupCount}</strong></div>
-    <div class="metric oof-metric"><span>${t("legendOof")}</span><strong>${stats.oofCount}</strong></div>
+    <div class="metric"><span>${escapeHtml(elapsedLabel)}</span><strong>${escapeHtml(elapsed)}</strong></div>
   `;
 }
 
 /* 4. 吞吐率时间线（sparkline）
    **系统级实时仪表**，不跟 flow 绑定：
    - 数据源固定为 appState.throughputSamples（每秒采样一次）
-   - bytes 是当前 allPackets 里所有 client 端 DATA 包的总字节数（跨所有 flow 累加）
+   - 每个 sample 同时记录 bytes（DATA/APP_DATA/STREAM 字节数）
+     和 events（client 端 *_RESPONSE / TEXT / PUBLISH / PING / PONG 包数）
    - 切 flow / 切 tab / 跑测试都不影响——曲线持续演化
-   - reset 才清空 samples（重新开始 30s 窗口）*/
+   - reset 才清空 samples（重新开始 30s 窗口）
+   - 当前协议是 transaction/message 时，sparkline 自动切到 events/s；
+     file 协议时切到 bytes/s。Label、metric 名称也跟着切。*/
 function renderThroughput(run) {
   const svg = byId("throughput-svg");
   const label = byId("throughput-label");
@@ -2691,24 +3034,49 @@ function renderThroughput(run) {
   if (!svg) return;
 
   const samples = appState.throughputSamples;
-  const rates = ratesFromSamples(samples);
+  const view = (run && run.transferView) || protocolTransferView(appState.selectedProtocol);
+  const metricKey = view === "file" ? "bytes" : "events";
+  const rates = metricKey === "bytes" ? ratesFromSamples(samples, "bytes") : ratesFromSamples(samples, "events");
   const max = rates.length ? Math.max(...rates, 1) : 1;
   const avg = rates.length ? rates.reduce((s, v) => s + v, 0) / rates.length : 0;
   const peak = max;
   const now = rates.length ? rates[rates.length - 1] || 0 : 0;
-  /* 窗口内总字节：最新 sample 的累计 - 最早 sample 的累计 */
-  const windowBytes = samples.length >= 2
-    ? Math.max(0, samples[samples.length - 1].bytes - samples[0].bytes)
+  /* 窗口内累计：最新 sample 的累计 - 最早 sample 的累计 */
+  const windowTotal = samples.length >= 2
+    ? Math.max(0, samples[samples.length - 1][metricKey] - samples[0][metricKey])
     : 0;
 
-  if (label) label.textContent = `${formatBytes(Math.round(now))}/s`;
+  const isEvents = metricKey === "events";
+  const unit = isEvents ? "/s" : "B/s";
+  const displayRate = (n) => isEvents
+    ? `${Math.round(n)} ${unit}`
+    : `${formatBytes(Math.round(n))} ${unit}`;
+  const displayTotal = (n) => isEvents
+    ? `${Math.round(n)}`
+    : `${formatBytes(n)}`;
+  /* 中文 mode 下 throughputNow 是"当前"，events 也用"当前速率"更精确；其他沿用 i18n。*/
+  const labels = isEvents
+    ? {
+        now: appState.language === "zh" ? "当前速率" : "Rate now",
+        avg: appState.language === "zh" ? "平均速率" : "Avg rate",
+        peak: appState.language === "zh" ? "峰值速率" : "Peak rate",
+        window: appState.language === "zh" ? "近 30s 事件数" : "Events (30s)",
+      }
+    : {
+        now: t("throughputNow"),
+        avg: t("throughputAvg"),
+        peak: t("throughputPeak"),
+        window: t("throughputWindow", {seconds: 30}),
+      };
+
+  if (label) label.textContent = `${displayRate(now)}`;
   if (clockNode) clockNode.textContent = formatTimeOfDay(new Date());
   if (statsNode) {
     statsNode.innerHTML = `
-      <div class="metric"><span>${t("throughputNow")}</span><strong>${formatBytes(Math.round(now))}/s</strong></div>
-      <div class="metric"><span>${t("throughputAvg")}</span><strong>${formatBytes(Math.round(avg))}/s</strong></div>
-      <div class="metric"><span>${t("throughputPeak")}</span><strong>${formatBytes(Math.round(peak))}/s</strong></div>
-      <div class="metric"><span>${t("throughputWindow", {seconds: 30})}</span><strong>${formatBytes(windowBytes)}</strong></div>
+      <div class="metric"><span>${escapeHtml(labels.now)}</span><strong>${escapeHtml(displayRate(now))}</strong></div>
+      <div class="metric"><span>${escapeHtml(labels.avg)}</span><strong>${escapeHtml(displayRate(avg))}</strong></div>
+      <div class="metric"><span>${escapeHtml(labels.peak)}</span><strong>${escapeHtml(displayRate(peak))}</strong></div>
+      <div class="metric"><span>${escapeHtml(labels.window)}</span><strong>${escapeHtml(displayTotal(windowTotal))}</strong></div>
     `;
   }
 
@@ -2746,16 +3114,16 @@ function renderThroughput(run) {
   `;
 }
 
-/* 滑动窗口：每个采样点 = (bytes_i - bytes_{i-1}) / dt。第一个点为 0（无参考）。*/
-function ratesFromSamples(samples) {
+/* 滑动窗口：每个采样点 = (s_i - s_{i-1}) / dt。第一个点为 0（无参考）。key 决定用哪个累积量。*/
+function ratesFromSamples(samples, key) {
   const rates = [];
   for (let i = 0; i < samples.length; i += 1) {
     if (i === 0) {
       rates.push(0);
     } else {
       const dt = Math.max(1, samples[i].t - samples[i - 1].t) / 1000;
-      const db = Math.max(0, samples[i].bytes - samples[i - 1].bytes);
-      rates.push(db / dt);
+      const dv = Math.max(0, (samples[i][key] || 0) - (samples[i - 1][key] || 0));
+      rates.push(dv / dt);
     }
   }
   return rates;
@@ -2792,23 +3160,27 @@ function renderFragmentMatrix(run, stats) {
   }
   matrix.classList.remove("protocol-event-list");
 
-  /* 摘要 + 图例 */
+  /* 摘要：5 个 pill，每个 pill 显示当前 flow 的对应计数；
+     颜色直接反映状态严重程度——绿/黄/红——和图例配色一致。 */
   if (summary) {
-    summary.innerHTML = `<span class="matrix-summary-text">${escapeHtml(t("matrixSummary", {
-      received: stats.receivedCount,
-      expected: stats.expectedCount || stats.receivedCount,
-      lost: stats.lostCount,
-      dup: stats.dupCount,
-      oof: stats.oofCount,
-    }))}</span>`;
+    const ok = stats.lostCount === 0 && stats.dupCount === 0 && stats.oofCount === 0;
+    const cls = ok ? "is-ok" : (stats.lostCount > 0 ? "is-bad" : "is-warn");
+    summary.innerHTML = `
+      <span class="summary-pill ${cls}"><strong>${stats.receivedCount}</strong><span>/</span><span>${stats.expectedCount || stats.receivedCount}</span><span>${escapeHtml(appState.language === "zh" ? "已收/期望" : "recv/expected")}</span></span>
+      <span class="summary-pill ${stats.lostCount > 0 ? "is-bad" : ""}"><strong>${stats.lostCount}</strong><span>${escapeHtml(t("legendLost"))}</span></span>
+      <span class="summary-pill ${stats.dupCount > 0 ? "is-warn" : ""}"><strong>${stats.dupCount}</strong><span>${escapeHtml(t("legendDup"))}</span></span>
+      <span class="summary-pill ${stats.oofCount > 0 ? "is-warn" : ""}"><strong>${stats.oofCount}</strong><span>${escapeHtml(t("legendOof"))}</span></span>
+    `;
   }
+  /* 图例：永远显示全部 5 类（lost/dup 受 showGaps/showDup toggle 影响——关掉时
+     用 opacity+line-through 灰显），并附每个状态的实时计数。 */
   if (legend) {
     legend.innerHTML = `
-      <span class="legend-chip legend-received">${escapeHtml(t("legendReceived"))}</span>
-      ${appState.matrixView.showGaps ? `<span class="legend-chip legend-lost">${escapeHtml(t("legendLost"))}</span>` : ""}
-      ${appState.matrixView.showDup ? `<span class="legend-chip legend-dup">${escapeHtml(t("legendDup"))}</span>` : ""}
-      <span class="legend-chip legend-oof">${escapeHtml(t("legendOof"))}</span>
-      <span class="legend-chip legend-pending">${escapeHtml(t("legendPending"))}</span>
+      <span class="legend-chip legend-received${stats.receivedCount === 0 ? " is-off" : ""}"><span class="legend-sample"></span><strong>${stats.receivedCount}</strong>${escapeHtml(t("legendReceived"))}</span>
+      <span class="legend-chip legend-lost${appState.matrixView.showGaps ? "" : " is-off"}"><span class="legend-sample"></span><strong>${stats.lostCount}</strong>${escapeHtml(t("legendLost"))}</span>
+      <span class="legend-chip legend-dup${appState.matrixView.showDup ? "" : " is-off"}"><span class="legend-sample"></span><strong>${stats.dupCount}</strong>${escapeHtml(t("legendDup"))}</span>
+      <span class="legend-chip legend-oof${stats.oofCount === 0 ? " is-off" : ""}"><span class="legend-sample"></span><strong>${stats.oofCount}</strong>${escapeHtml(t("legendOof"))}</span>
+      <span class="legend-chip legend-pending${stats.pendingIds.size === 0 ? " is-off" : ""}"><span class="legend-sample"></span><strong>${stats.pendingIds.size}</strong>${escapeHtml(t("legendPending"))}</span>
     `;
   }
 
@@ -2846,6 +3218,15 @@ function renderFragmentMatrix(run, stats) {
   }
 
   let cells = "";
+  /* 单元格内是否显示 packet_id 编号：
+     - total ≤ 80 → 一定显示，便于核对包序号
+     - total ≤ 160 → 在未丢失的格子上显示数字（丢失的格子用 ✕ 代替数字）
+     - total > 160 → 不显示，避免视觉噪声 */
+  const showLabelMode = total <= 80 ? "all" : total <= 160 ? "received" : "none";
+  /* 时间带 CSS 变量：每个 received 格子的 --time-band 设为 (1 - t/span) * 100%，
+     CSS 据此画一条左侧渐变到右侧的进度线，earlier=宽线 → later=窄线，
+     让"哪个包先到、哪个包后到"在视觉上一目了然。*/
+  const showTime = view.showTime;
   for (let id = 0; id < total; id += 1) {
     const classes = ["fragment"];
     const isReceived = stats.recvIds.has(id);
@@ -2859,16 +3240,47 @@ function renderFragmentMatrix(run, stats) {
     if (isOof) classes.push("oof");
     if (isPending) classes.push("pending");
     if (id === appState.hoverFragmentId) classes.push("hovering");
-    cells += `<button class="${classes.join(" ")}" data-fragment-id="${id}" type="button" aria-label="DATA #${id}"></button>`;
+    let label = "";
+    if (showLabelMode === "all" && !isLost && !isPending) {
+      label = `<span class="fragment-label">${id}</span>`;
+    } else if (showLabelMode === "received" && isReceived) {
+      label = `<span class="fragment-label">${id}</span>`;
+    }
+    /* 时间带 style：仅 received 格子设置 --time-band；其余格子省略让 CSS 用 0% 默认值 */
+    let style = "";
+    if (showTime && isReceived) {
+      const t = recvTimeById.get(id);
+      if (typeof t === "number") {
+        const ratio = span > 0 ? Math.max(0, Math.min(1, (t - firstRecvTime) / span)) : 0;
+        /* 用 (1 - ratio) 让"最先到"的格子有最宽的亮带，模拟"先到先得"的进度感 */
+        const bandPct = Math.round((1 - ratio) * 100);
+        style = ` style="--time-band:${bandPct}%"`;
+      }
+    }
+    cells += `<button class="${classes.join(" ")}"${style} data-fragment-id="${id}" type="button" aria-label="DATA #${id}">${label}</button>`;
   }
+  matrix.classList.toggle("show-labels", showLabelMode !== "none");
   matrix.innerHTML = cells;
 }
 
 /* 6. 完整性面板：直接写字段，不复用 digestMarkup（避免 h2 重复）。
-   digestMarkup 会自己生成 panel-head 的 h2，但我们这块面板已经有自己的 panel-head。 */
+   digestMarkup 会自己生成 panel-head 的 h2，但我们这块面板已经有自己的 panel-head。
+   transaction/message 类协议会走 altIntegrityFor。 */
 function renderIntegrity(run) {
   const node = byId("transfer-digest");
   if (!node) return;
+  const view = run.transferView || protocolTransferView(run.protocol);
+  if (view !== "file") {
+    const alt = altIntegrityFor(run, view);
+    if (alt) {
+      /* 外层已有 panel-head，我们只输出 status badge + digest-lines。 */
+      node.innerHTML = `
+        <div class="digest-status"><span class="badge ${escapeHtml(alt.badge)}">${escapeHtml(alt.state)}</span></div>
+        ${renderIntegrityLines(alt, /* includePanelHead */ false)}
+      `;
+      return;
+    }
+  }
   const state = run.clientDigest
     ? (run.digestMatch ? t("digestMatch") : t("digestMismatch"))
     : t("waiting");
@@ -2961,10 +3373,19 @@ function hideFragmentTooltip() {
    **不跟 flow 绑定**：bytes 是当前 allPackets 里所有 client-received DATA 的总字节数。
    这样 sparkline 反映的是"系统此刻的实时吞吐率"，无论用户在看哪个 flow、是否在跑 transfer。*/
 function sampleThroughput() {
-  const totalBytes = appState.allPackets
+  /* 双指标采样：bytes 用于 file 协议（DATA/APP_DATA/STREAM），
+     events 用于 transaction/message 协议（client 端 *_RESPONSE / TEXT / PUBLISH / PING / PONG）。
+     这样 HTTP/DNS/OAuth/SIP/RADIUS/HTTP2 的 RESPONSE 和 WebSocket/MQTT 的 TEXT/PUBLISH
+     都能驱动 sparkline，而不再只对 file 视图协议有反应。 */
+  const fileBytes = appState.allPackets
     .filter((e) => e.role === "client" && ["DATA", "APP_DATA", "STREAM"].includes(e.packet_type))
     .reduce((s, e) => s + Number(e.bytes || e.payload_length || 0), 0);
-  appState.throughputSamples.push({t: Date.now(), bytes: totalBytes});
+  const eventCount = appState.allPackets
+    .filter((e) => e.role === "client" && (
+      /_RESPONSE$/.test(String(e.packet_type || "")) ||
+      ["TEXT", "PUBLISH", "PING", "PONG"].includes(String(e.packet_type || ""))
+    )).length;
+  appState.throughputSamples.push({t: Date.now(), bytes: fileBytes, events: eventCount});
   if (appState.throughputSamples.length > 30) appState.throughputSamples.shift();
 }
 
@@ -3858,15 +4279,17 @@ async function boot() {
   /* After the first log load, advance the flow counter past anything already
      present so refreshes don't regenerate the same flow IDs. */
   appState.flowCounter = Math.max(appState.flowCounter, maxExistingFlowCounter(appState.logs));
+  /* 首次访问欢迎面板：localStorage 标记控制是否再显示 */
+  initWelcomeOverlay();
   connectWebSocket();
   setInterval(refreshStatus, 2500);
   setInterval(refreshLogs, 6000);
-  /* 吞吐率采样：每秒一次。sparkline 渲染也走同一周期。 */
+  /* 吞吐率采样：每秒一次。sparkline 渲染也走同一周期。
+     注意：不在 activeTab==="transfer" 才渲染——即使当前在 dashboard，
+     throughput SVG/labels 也要随时更新（这是 panel-head 的实时仪表）。*/
   setInterval(() => {
     sampleThroughput();
-    if (appState.activeTab === "transfer") {
-      renderThroughput(deriveRun());
-    }
+    renderThroughput(deriveRun());
   }, 1000);
 }
 

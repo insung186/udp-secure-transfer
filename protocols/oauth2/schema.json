@@ -1,0 +1,26 @@
+{
+  "id": "oauth2",
+  "name": "OAuth 2.0",
+  "name_en": "OAuth 2.0",
+  "version": "2",
+  "transport": "tcp",
+  "summary": "教学版 OAuth 2.0：HTTP 之上的授权码流 + PKCE + token 刷新，演示重定向 URI 校验、PKCE verifier 绑定、token 重放检测。",
+  "transferView": "transaction",
+  "sequenceStages": ["AUTHORIZE_REQUEST", "REDIRECT_RESPONSE", "TOKEN_REQUEST", "TOKEN_RESPONSE", "RESOURCE_REQUEST", "RESOURCE_RESPONSE", "REFRESH_REQUEST", "REFRESH_RESPONSE"],
+  "packetTypes": [
+    {"code": 120, "name": "AUTHORIZE_REQUEST"},
+    {"code": 121, "name": "REDIRECT_RESPONSE"},
+    {"code": 122, "name": "TOKEN_REQUEST"},
+    {"code": 123, "name": "TOKEN_RESPONSE"},
+    {"code": 124, "name": "RESOURCE_REQUEST"},
+    {"code": 125, "name": "RESOURCE_RESPONSE"},
+    {"code": 126, "name": "REFRESH_REQUEST"},
+    {"code": 127, "name": "REFRESH_RESPONSE"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "method", "path",
+    "status_code", "header_summary", "payload_length", "bytes",
+    "packet_uid", "wire_hex"
+  ]
+}

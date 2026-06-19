@@ -1,0 +1,26 @@
+{
+  "id": "dns",
+  "name": "DNS",
+  "name_en": "DNS",
+  "version": "2",
+  "transport": "udp",
+  "summary": "教学版 DNS 协议：简化 DNS-over-UDP wire 格式（txid + flags + 计数段 + name + qtype/qclass），演示缓存投毒、应答伪造、DoH 加密对比。",
+  "transferView": "transaction",
+  "sequenceStages": ["DNS_QUERY", "DNS_RESPONSE", "DNS_AUTH_RESPONSE", "DNS_RESOLVED"],
+  "packetTypes": [
+    {"code": 100, "name": "DNS_QUERY"},
+    {"code": 101, "name": "DNS_RESPONSE"},
+    {"code": 102, "name": "DNS_AUTH_RESPONSE"},
+    {"code": 103, "name": "DNS_RESPONSE_SUSPICIOUS"},
+    {"code": 104, "name": "DNS_RESPONSE_NXDOMAIN"},
+    {"code": 105, "name": "DNS_CACHE_POISONED"},
+    {"code": 110, "name": "DOH_REQUEST"},
+    {"code": 111, "name": "DOH_RESPONSE"}
+  ],
+  "logFields": [
+    "protocol", "transport", "flow_id", "session_id", "scenario",
+    "event", "state", "message", "packet_type", "qname", "qtype",
+    "rcode", "answer_count", "payload_length", "bytes",
+    "packet_uid", "wire_hex"
+  ]
+}

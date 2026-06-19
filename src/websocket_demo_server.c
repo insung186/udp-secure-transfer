@@ -98,9 +98,12 @@ static void log_ws_packet(Logger *logger, const char *level, const char *event, 
 static int send_frame(Logger *logger, int fd, const char *peer, uint8_t opcode,
                       const uint8_t *payload, size_t payload_len,
                       const char *packet_type, int packet_code) {
-    uint8_t wire[2 + WS_MAX_PAYLOAD];
+    /* WS_MAX_PAYLOAD=1024 超过 7-bit 长度上限 125——本函数只支持 7-bit 长度，
+       调用方需把 payload 切成 ≤ 125 字节的片（教学 demo 不实现 126/127 扩展长度）。
+       旧版没做这个保护，> 125 字节的 payload 会被截成截断长度发送，客户端立即错位解析。 */
+    uint8_t wire[2 + 125];
     const char *frame_type = packet_type;
-    if (payload_len > WS_MAX_PAYLOAD) {
+    if (payload_len > 125) {
         return -1;
     }
     wire[0] = 0x80U | opcode;
@@ -338,12 +341,24 @@ int main(int argc, char **argv) {
     }
     text_len = fread(text_buf, 1, sizeof(text_buf), fp);
     fclose(fp);
-    if (send_frame(&logger, fd, peer, 0x1U, text_buf, text_len, "TEXT", 42) != 0) {
-        demo_finish(&logger, "ABORT", "text frame send failed");
-        close(fd);
-        close(listener);
-        logger_close(&logger);
-        return 1;
+    /* send_frame 限制 payload ≤ 125 字节。教学 demo 把读到的 text 切成多个
+       TEXT 帧依次发完，client 端按 fwrite 顺序拼接。 */
+    {
+        size_t offset = 0;
+        while (offset < text_len) {
+            size_t chunk = text_len - offset;
+            if (chunk > 125) {
+                chunk = 125;
+            }
+            if (send_frame(&logger, fd, peer, 0x1U, text_buf + offset, chunk, "TEXT", 42) != 0) {
+                demo_finish(&logger, "ABORT", "text frame send failed");
+                close(fd);
+                close(listener);
+                logger_close(&logger);
+                return 1;
+            }
+            offset += chunk;
+        }
     }
     if (scenario && strcmp(scenario, "unexpected-close") == 0) {
         demo_finish(&logger, "ABORT", "unexpected close scenario");
