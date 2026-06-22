@@ -336,7 +336,7 @@
   --stage-final: #B5C4CE;
   --success: #3F8E5C;  /* 比 #5C8A6A 饱和度更高 */
   --warning: #C49A4A;
-  --danger: #8B6868;  /* 冷雾主题：偏灰偏冷，避免在浅灰底上像粉红警告色 */
+  --danger: #3D4F5F;  /* Nordic: 冷色深石板蓝，避免红/粉色调在浅灰底上突兀；深色仍可读为 "error" 警示 */
   --code-bg: #DDE3E7;
   --radius: 14px;
   --control-radius: 10px;
@@ -521,9 +521,9 @@
   --stage-control: #7A9059;
   --stage-auth: #6B7A53;
   --stage-data: #A8B57A;
-  --stage-final: #B84418;
+  --stage-final: #5A3A24;  /* Matcha: 焦糖深褐，替代朱土红；保持阶段完成提示但不跳红色 */
   --warning: #C49A4A;
-  --danger: #8B5A3A;  /* 抹茶：朱土色调去饱和度，避免在米黄底上跳出"红字警告"感 */
+  --danger: #3D2E1F;  /* Matcha: 深茶褐，替代朱土橙；去红调，在米黄底上不再像粉红警告 */
   --code-bg: #E0DFC8;
   --radius: 16px;
   --control-radius: 12px;
@@ -718,4 +718,386 @@
 :root[data-theme="cyber"] .theme-decor-blob-2,
 :root[data-theme="cyber"] .theme-decor-blob-3 {
   display: none;
+}
+
+/* -----------------------------------------------------------------------------
+ * 浅色主题（matcha / nordic）修复补丁
+ *
+ * 之前反复出现"淡红/淡粉"底色的根本原因：
+ * 1. .panel 的 backdrop-filter: blur(20px) saturate(1.24) 会把页面背景的色相放大
+ * 2. theme-decor-blob 用 filter: blur(50px) opacity:0.5 创建大型柔光
+ * 3. .bg-gradient 在 matcha 是 green→cream 渐变；saturate(1.24) 把 cream 染成偏红
+ * 4. 容器用 var(--glass)（半透明白/灰）让背景光斑透过来
+ * 组合后，.panel 下方出现"红/粉色高光"，导致实时日志/包列表/密码区看起来发红
+ *
+ * 修复策略：浅色主题彻底关掉装饰 + 透射 + 渐变，让底色完全等于 --bg
+ * ----------------------------------------------------------------------------- */
+
+/* matcha：去掉渐变和装饰光斑；用纯色背景 */
+:root[data-theme="matcha"] body,
+:root[data-theme="matcha"] .workbench,
+:root[data-theme="matcha"] .app-shell {
+  background: var(--bg) !important;
+  background-image: none !important;
+}
+:root[data-theme="matcha"] .theme-decor-blob-1,
+:root[data-theme="matcha"] .theme-decor-blob-2,
+:root[data-theme="matcha"] .theme-decor-blob-3 {
+  display: none !important;
+}
+/* matcha：把容器的 glass 替换为不透明 surface，彻底切断光斑透色 */
+:root[data-theme="matcha"] .panel,
+:root[data-theme="matcha"] .control-section,
+:root[data-theme="matcha"] .topbar,
+:root[data-theme="matcha"] .control-sidebar,
+:root[data-theme="matcha"] .control-bar,
+:root[data-theme="matcha"] .password-mode-panel,
+:root[data-theme="matcha"] .password-toggle,
+:root[data-theme="matcha"] .log-panel,
+:root[data-theme="matcha"] .packet-table-panel,
+:root[data-theme="matcha"] .hero-panel,
+:root[data-theme="matcha"] .metrics-panel,
+:root[data-theme="matcha"] .digest-panel,
+:root[data-theme="matcha"] .recent-panel,
+:root[data-theme="matcha"] .transfer-panel,
+:root[data-theme="matcha"] .protocol-panel,
+:root[data-theme="matcha"] .logs-panel,
+:root[data-theme="matcha"] .hero-card,
+:root[data-theme="matcha"] .config-state,
+:root[data-theme="matcha"] .quickstart-banner,
+:root[data-theme="matcha"] .protocol-compare-card,
+:root[data-theme="matcha"] .quickstart-steps li {
+  background-color: var(--surface) !important;
+  background-image: none !important;
+}
+
+/* nordic：去掉渐变和装饰光斑；用纯色背景 */
+:root[data-theme="nordic"] body,
+:root[data-theme="nordic"] .workbench,
+:root[data-theme="nordic"] .app-shell {
+  background: var(--bg) !important;
+  background-image: none !important;
+}
+:root[data-theme="nordic"] .theme-decor-blob-1,
+:root[data-theme="nordic"] .theme-decor-blob-2,
+:root[data-theme="nordic"] .theme-decor-blob-3 {
+  display: none !important;
+}
+/* nordic：把容器的 glass 替换为不透明 surface */
+:root[data-theme="nordic"] .panel,
+:root[data-theme="nordic"] .control-section,
+:root[data-theme="nordic"] .topbar,
+:root[data-theme="nordic"] .control-sidebar,
+:root[data-theme="nordic"] .control-bar,
+:root[data-theme="nordic"] .password-mode-panel,
+:root[data-theme="nordic"] .password-toggle,
+:root[data-theme="nordic"] .log-panel,
+:root[data-theme="nordic"] .packet-table-panel,
+:root[data-theme="nordic"] .hero-panel,
+:root[data-theme="nordic"] .metrics-panel,
+:root[data-theme="nordic"] .digest-panel,
+:root[data-theme="nordic"] .recent-panel,
+:root[data-theme="nordic"] .transfer-panel,
+:root[data-theme="nordic"] .protocol-panel,
+:root[data-theme="nordic"] .logs-panel,
+:root[data-theme="nordic"] .hero-card,
+:root[data-theme="nordic"] .config-state,
+:root[data-theme="nordic"] .quickstart-banner,
+:root[data-theme="nordic"] .protocol-compare-card,
+:root[data-theme="nordic"] .quickstart-steps li {
+  background-color: var(--surface) !important;
+  background-image: none !important;
+}
+/* 浅色主题：表行/单元格也不得有半透明 / oklch mix */
+:root[data-theme="matcha"] .log-table-wrap,
+:root[data-theme="matcha"] .table-wrap,
+:root[data-theme="matcha"] .log-table,
+:root[data-theme="matcha"] .packet-table,
+:root[data-theme="matcha"] .log-table thead th,
+:root[data-theme="matcha"] .log-table tbody tr,
+:root[data-theme="matcha"] .log-table tbody td,
+:root[data-theme="matcha"] .packet-table thead th,
+:root[data-theme="matcha"] .packet-table tbody tr,
+:root[data-theme="matcha"] .packet-table tbody td {
+  background: var(--surface) !important;
+  background-color: var(--surface) !important;
+  background-image: none !important;
+  color: var(--ink) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root[data-theme="nordic"] .log-table-wrap,
+:root[data-theme="nordic"] .table-wrap,
+:root[data-theme="nordic"] .log-table,
+:root[data-theme="nordic"] .packet-table,
+:root[data-theme="nordic"] .log-table thead th,
+:root[data-theme="nordic"] .log-table tbody tr,
+:root[data-theme="nordic"] .log-table tbody td,
+:root[data-theme="nordic"] .packet-table thead th,
+:root[data-theme="nordic"] .packet-table tbody tr,
+:root[data-theme="nordic"] .packet-table tbody td {
+  background: var(--surface) !important;
+  background-color: var(--surface) !important;
+  background-image: none !important;
+  color: var(--ink) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* 行高亮：也用纯 surface 加 ink 微调，不引入 oklch 色相偏移 */
+:root[data-theme="matcha"] .log-table tbody tr:hover,
+:root[data-theme="matcha"] .packet-table tbody tr:hover {
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface)) !important;
+}
+:root[data-theme="nordic"] .log-table tbody tr:hover,
+:root[data-theme="nordic"] .packet-table tbody tr:hover {
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface)) !important;
+}
+
+/* 浅色主题彻底关 backdrop-filter（避免 saturate 把背景染红/粉） */
+:root[data-theme="matcha"] .panel,
+:root[data-theme="matcha"] .control-section,
+:root[data-theme="matcha"] .topbar,
+:root[data-theme="matcha"] .control-sidebar,
+:root[data-theme="matcha"] .control-bar,
+:root[data-theme="matcha"] .password-mode-panel,
+:root[data-theme="matcha"] .password-toggle,
+:root[data-theme="matcha"] .log-panel,
+:root[data-theme="matcha"] .packet-table-panel,
+:root[data-theme="matcha"] .metric,
+:root[data-theme="matcha"] .log-entry,
+:root[data-theme="matcha"] .summary-pill,
+:root[data-theme="matcha"] .legend-chip,
+:root[data-theme="matcha"] .status-pill,
+:root[data-theme="matcha"] .badge,
+:root[data-theme="matcha"] .hero-panel,
+:root[data-theme="matcha"] .protocol-summary-panel,
+:root[data-theme="matcha"] .metrics-panel,
+:root[data-theme="matcha"] .digest-panel,
+:root[data-theme="matcha"] .recent-panel,
+:root[data-theme="matcha"] .phase-rail,
+:root[data-theme="matcha"] .transfer-panel,
+:root[data-theme="matcha"] .protocol-panel,
+:root[data-theme="matcha"] .logs-panel,
+:root[data-theme="matcha"] .hero-card,
+:root[data-theme="matcha"] .config-state,
+:root[data-theme="matcha"] .quickstart-banner,
+:root[data-theme="matcha"] .protocol-compare-card,
+:root[data-theme="matcha"] .welcome-overlay,
+:root[data-theme="matcha"] .welcome-card,
+:root[data-theme="matcha"] .help-button,
+:root[data-theme="matcha"] .quickstart-steps li {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+:root[data-theme="nordic"] .panel,
+:root[data-theme="nordic"] .control-section,
+:root[data-theme="nordic"] .topbar,
+:root[data-theme="nordic"] .control-sidebar,
+:root[data-theme="nordic"] .control-bar,
+:root[data-theme="nordic"] .password-mode-panel,
+:root[data-theme="nordic"] .password-toggle,
+:root[data-theme="nordic"] .log-panel,
+:root[data-theme="nordic"] .packet-table-panel,
+:root[data-theme="nordic"] .metric,
+:root[data-theme="nordic"] .log-entry,
+:root[data-theme="nordic"] .summary-pill,
+:root[data-theme="nordic"] .legend-chip,
+:root[data-theme="nordic"] .status-pill,
+:root[data-theme="nordic"] .badge,
+:root[data-theme="nordic"] .hero-panel,
+:root[data-theme="nordic"] .protocol-summary-panel,
+:root[data-theme="nordic"] .metrics-panel,
+:root[data-theme="nordic"] .digest-panel,
+:root[data-theme="nordic"] .recent-panel,
+:root[data-theme="nordic"] .phase-rail,
+:root[data-theme="nordic"] .transfer-panel,
+:root[data-theme="nordic"] .protocol-panel,
+:root[data-theme="nordic"] .logs-panel,
+:root[data-theme="nordic"] .hero-card,
+:root[data-theme="nordic"] .config-state,
+:root[data-theme="nordic"] .quickstart-banner,
+:root[data-theme="nordic"] .protocol-compare-card,
+:root[data-theme="nordic"] .welcome-overlay,
+:root[data-theme="nordic"] .welcome-card,
+:root[data-theme="nordic"] .help-button,
+:root[data-theme="nordic"] .quickstart-steps li {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* -----------------------------------------------------------------------------
+ * 浅色主题（matcha / nordic）—— 第二轮"无死角"覆盖
+ *
+ * 第一轮覆盖了 .panel / .topbar / .control-section / .log-panel / .packet-table-panel
+ * 等大体量容器，但截图实测仍有底色：
+ * 1. 实时日志：每行 .log-table tbody tr / td 仍然被父级 .log-table-wrap 的 oklch mix
+ *    "染色"。问题在 .log-table-wrap 自己用 color-mix(oklch, glass 74%, surface)，
+ *    oklch 色彩空间下 cream surface 透过 backdrop 会被解读为带色相 → 看起来发粉。
+ * 2. 包检查器：每行 .field-list div 用 color-mix(oklch, surface 72%, transparent)，
+ *    transparent 在 oklch 下是保留色相的透明，叠加到任何带色相的 parent 上偏移色相。
+ * 3. 密码输入框 .password-field：用 var(--glass-strong)（抹茶 #FAFAF0），在浅米黄
+ *    surface 上是亮奶白方框，srgb 渲染下会偏暖 → 看起来发粉。
+ * 4. 兼容三密码 .segmented label:has(input:checked)：用 var(--glass-strong) + 带
+ *    oklch 阴影的 box-shadow，抹茶下亮奶白+灰阴影也会偏粉。
+ *
+ * 修复策略：
+ * - 上述选择器在抹茶/北欧 强制用 var(--surface) 直接覆盖，不再 mix 透明
+ * - 抹茶/北欧 强制所有用 color-mix(oklch, ..., transparent) 的容器改 srgb mix
+ *   到 --surface（保留视觉层次但不再透色）
+ * - 抹茶/北欧 的 .seg-btn.is-active 和 .segmented label:has(input:checked)
+ *   强制用 var(--primary) 作为底色，避免被亮奶白替换
+ * ----------------------------------------------------------------------------- */
+
+/* ---- 抹茶：所有"接近白色"的容器改用 surface，避免奶白发粉 ---- */
+:root[data-theme="matcha"] .log-table-wrap,
+:root[data-theme="matcha"] .table-wrap,
+:root[data-theme="matcha"] .log-table,
+:root[data-theme="matcha"] .packet-table,
+:root[data-theme="matcha"] .password-field,
+:root[data-theme="matcha"] .password-mode-panel,
+:root[data-theme="matcha"] .field-list div,
+:root[data-theme="matcha"] .field-list .mono,
+:root[data-theme="matcha"] .segmented label:has(input:checked) {
+  background-color: var(--surface) !important;
+  background-image: none !important;
+  box-shadow: var(--soft-shadow-sm, none) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+:root[data-theme="matcha"] .seg-btn.is-active,
+:root[data-theme="matcha"] .segmented label:has(input:checked) {
+  background-color: var(--primary) !important;
+  color: var(--text-on-primary, #fff) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 1px 2px rgba(46, 58, 36, 0.18) !important;
+}
+
+/* ---- 北欧：同样覆盖 ---- */
+:root[data-theme="nordic"] .log-table-wrap,
+:root[data-theme="nordic"] .table-wrap,
+:root[data-theme="nordic"] .log-table,
+:root[data-theme="nordic"] .packet-table,
+:root[data-theme="nordic"] .password-field,
+:root[data-theme="nordic"] .password-mode-panel,
+:root[data-theme="nordic"] .field-list div,
+:root[data-theme="nordic"] .field-list .mono,
+:root[data-theme="nordic"] .segmented label:has(input:checked) {
+  background-color: var(--surface) !important;
+  background-image: none !important;
+  box-shadow: var(--soft-shadow-sm, none) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+:root[data-theme="nordic"] .seg-btn.is-active,
+:root[data-theme="nordic"] .segmented label:has(input:checked) {
+  background-color: var(--primary) !important;
+  color: var(--text-on-primary, #fff) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 1px 2px rgba(31, 42, 51, 0.18) !important;
+}
+
+/* ---- 抹茶/北欧：包检查器、密码、表格行 hover 也用 srgb 混色避免色相偏移 ---- */
+:root[data-theme="matcha"] .field-list div:hover,
+:root[data-theme="matcha"] .log-table tbody tr:hover,
+:root[data-theme="matcha"] .packet-table tbody tr:hover,
+:root[data-theme="matcha"] .password-field:hover {
+  background-color: color-mix(in srgb, var(--primary) 6%, var(--surface)) !important;
+  background-image: none !important;
+}
+:root[data-theme="nordic"] .field-list div:hover,
+:root[data-theme="nordic"] .log-table tbody tr:hover,
+:root[data-theme="nordic"] .packet-table tbody tr:hover,
+:root[data-theme="nordic"] .password-field:hover {
+  background-color: color-mix(in srgb, var(--primary) 6%, var(--surface)) !important;
+  background-image: none !important;
+}
+
+/* ---- 抹茶/北欧：log-table-wrap 自身 backdrop 关掉，row gap 用 surface 分隔 ---- */
+:root[data-theme="matcha"] .log-table tbody tr td {
+  background-color: var(--surface) !important;
+  background-image: none !important;
+  border-color: var(--line) !important;
+}
+:root[data-theme="nordic"] .log-table tbody tr td {
+  background-color: var(--surface) !important;
+  background-image: none !important;
+  border-color: var(--line) !important;
+}
+
+/* ---- 抹茶/北欧：保险措施 - 直接给 .field-list div、密码、表格行用 srgb 写死
+   （即使前面 mix 规则被覆盖，这里也保证是中性 cream 底，无粉色调）---- */
+:root[data-theme="matcha"] .field-list div {
+  background: #F5F4E8 !important;
+}
+:root[data-theme="nordic"] .field-list div {
+  background: #F5F7F8 !important;
+}
+:root[data-theme="matcha"] .password-field {
+  background: #F5F4E8 !important;
+  border-color: #D8D8C0 !important;
+}
+:root[data-theme="nordic"] .password-field {
+  background: #F5F7F8 !important;
+  border-color: #D5DCE0 !important;
+}
+:root[data-theme="matcha"] .log-table-wrap,
+:root[data-theme="matcha"] .packet-table-panel {
+  background: #F5F4E8 !important;
+  background-image: none !important;
+}
+:root[data-theme="nordic"] .log-table-wrap,
+:root[data-theme="nordic"] .packet-table-panel {
+  background: #F5F7F8 !important;
+  background-image: none !important;
+}
+
+/* ---- 第三轮：.segmented 父容器（fieldset）也是 oklch 半透明 mix → 抹茶/北欧下
+   整个 segmented 看起来"半透明米黄方框"，叠加在 surface 上被解读为偏粉。
+   直接写死 surface 色，去掉半透明。 ---- */
+:root[data-theme="matcha"] .segmented,
+:root[data-theme="matcha"] .segmented-control {
+  background: #F5F4E8 !important;
+  background-image: none !important;
+  border-color: #D8D8C0 !important;
+  box-shadow: var(--soft-shadow-sm, none) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root[data-theme="nordic"] .segmented,
+:root[data-theme="nordic"] .segmented-control {
+  background: #F5F7F8 !important;
+  background-image: none !important;
+  border-color: #D5DCE0 !important;
+  box-shadow: var(--soft-shadow-sm, none) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* .segmented 内 label hover / 选中 也写死，避免 oklch mix */
+:root[data-theme="matcha"] .segmented label:hover,
+:root[data-theme="matcha"] .segmented-control .seg-btn:hover:not(.is-active) {
+  background: #EBEADD !important;  /* 抹茶 surface 略深 */
+  background-image: none !important;
+  color: var(--ink) !important;
+}
+:root[data-theme="nordic"] .segmented label:hover,
+:root[data-theme="nordic"] .segmented-control .seg-btn:hover:not(.is-active) {
+  background: #ECEFF1 !important;  /* 北欧 surface 略深 */
+  background-image: none !important;
+  color: var(--ink) !important;
+}
+/* 选中态：抹茶用 primary 橄榄绿 + 白字；北欧用 primary 深蓝 + 白字 */
+:root[data-theme="matcha"] .segmented label:has(input:checked),
+:root[data-theme="matcha"] .segmented-control .seg-btn.is-active {
+  background: #7A9059 !important;
+  background-image: none !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 1px 2px rgba(46, 58, 36, 0.20) !important;
+}
+:root[data-theme="nordic"] .segmented label:has(input:checked),
+:root[data-theme="nordic"] .segmented-control .seg-btn.is-active {
+  background: #3E5C76 !important;
+  background-image: none !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 1px 2px rgba(31, 42, 51, 0.20) !important;
 }

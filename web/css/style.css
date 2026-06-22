@@ -228,6 +228,48 @@ h3 {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+/* 浅色主题表格 / 表行：必须用 srgb 直接混色，避免 oklch 在抹茶/北欧下
+   出现意外色相偏移（已多次实测会出现"红/粉"行底色）。
+   log-table-wrap / table-wrap / 表格 / thead / tbody / tr / td 一并固化。 */
+:root[data-theme="matcha"] .log-table-wrap,
+:root[data-theme="matcha"] .table-wrap,
+:root[data-theme="matcha"] .log-table,
+:root[data-theme="matcha"] .packet-table {
+  background: var(--surface) !important;
+  background-image: none !important;
+}
+:root[data-theme="nordic"] .log-table-wrap,
+:root[data-theme="nordic"] .table-wrap,
+:root[data-theme="nordic"] .log-table,
+:root[data-theme="nordic"] .packet-table {
+  background: var(--surface) !important;
+  background-image: none !important;
+}
+:root[data-theme="matcha"] .log-table thead th,
+:root[data-theme="matcha"] .log-table tbody tr,
+:root[data-theme="matcha"] .log-table tbody td,
+:root[data-theme="matcha"] .packet-table thead th,
+:root[data-theme="matcha"] .packet-table tbody tr,
+:root[data-theme="matcha"] .packet-table tbody td {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+}
+:root[data-theme="nordic"] .log-table thead th,
+:root[data-theme="nordic"] .log-table tbody tr,
+:root[data-theme="nordic"] .log-table tbody td,
+:root[data-theme="nordic"] .packet-table thead th,
+:root[data-theme="nordic"] .packet-table tbody tr,
+:root[data-theme="nordic"] .packet-table tbody td {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+}
+/* 行 hover 也用 srgb mix，避免 oklch 偏移 */
+:root[data-theme="matcha"] .log-table tbody tr:hover,
+:root[data-theme="matcha"] .packet-table tbody tr:hover,
+:root[data-theme="nordic"] .log-table tbody tr:hover,
+:root[data-theme="nordic"] .packet-table tbody tr:hover {
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface)) !important;
+}
 :root[data-theme="metal"] .control-section,
 :root[data-theme="metal"] .panel {
   backdrop-filter: none;
@@ -1404,6 +1446,50 @@ select:focus-visible {
   -webkit-backdrop-filter: none;
   box-shadow: var(--soft-shadow-sm, none);
 }
+/* 密码输入的眼睛按钮（password-toggle）：原样式 color-mix(surface 78%, transparent)
+   留了 22% 透明，浅色主题的 .panel saturate(1.24) 会透过这层透明把眼底的 cream 染
+   成淡红/淡粉。强制 3 主题不透明。 */
+:root[data-theme="neumorph"] .password-toggle,
+:root[data-theme="nordic"] .password-toggle,
+:root[data-theme="matcha"] .password-toggle {
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme="neumorph"] .password-toggle:hover,
+:root[data-theme="nordic"] .password-toggle:hover,
+:root[data-theme="matcha"] .password-toggle:hover {
+  background: color-mix(in oklch, var(--primary) 8%, var(--surface));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* 实时日志 / 包列表：.panel 的 backdrop-filter: blur(20px) saturate(1.24)
+   在 matcha/nordic 浅色背景上把日志卡片/包行染成淡红/淡粉。强制这些面板 + 行
+   内部容器去 backdrop-filter 并用不透明 surface。 */
+:root[data-theme="neumorph"] .log-panel,
+:root[data-theme="nordic"] .log-panel,
+:root[data-theme="matcha"] .log-panel,
+:root[data-theme="neumorph"] .packet-table-panel,
+:root[data-theme="nordic"] .packet-table-panel,
+:root[data-theme="matcha"] .packet-table-panel {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--surface);
+}
+:root[data-theme="neumorph"] .log-entry,
+:root[data-theme="nordic"] .log-entry,
+:root[data-theme="matcha"] .log-entry {
+  background: var(--surface);
+}
+:root[data-theme="neumorph"] .log-level,
+:root[data-theme="nordic"] .log-level,
+:root[data-theme="matcha"] .log-level {
+  /* log-level-error 用 var(--danger) 22% 混 surface，在 matcha 浅色底 + 装饰光斑
+     叠加下会显得过于暖/红。改用强 alpha 的 surface 渐变提示但保持语义 */
+  --log-err-bg: color-mix(in oklch, var(--ink) 12%, var(--surface));
+  --log-err-fg: var(--ink);
+  --log-err-bd: color-mix(in oklch, var(--ink) 28%, var(--line));
+}
 /* 密码区底下有时候会看到一条淡红"溢出"——因为 .panel 的 box-shadow 是 var(--soft-shadow)
    里有 inset 高光。3 主题的 --soft-shadow 是双向投影，本身不该是红色，但当容器
    不够"实"时装饰光斑透过会变成"暖色高光"。直接把容器的 background-color 强制设成
@@ -2308,8 +2394,10 @@ input[type="datetime-local"]:hover:not(:focus) {
   min-height: 86px;
   padding: 12px 10px;
   border-radius: var(--control-radius);
-  background: color-mix(in oklch, var(--surface) 72%, var(--bg));
-  border: var(--border-width, 1px) var(--border-style, solid) color-mix(in oklch, var(--line) 76%, transparent);
+  /* 直接用 --surface，避免 oklch color-mix 在某些浏览器/主题下意外偏粉/偏红；
+     同时和 .panel(--glass) 区分：metric 略亮一点点以保留卡片视觉层级 */
+  background: var(--surface);
+  border: var(--border-width, 1px) var(--border-style, solid) var(--line);
   text-align: center;
   transition: background-color 180ms ease, box-shadow 180ms ease;
 }
@@ -4055,6 +4143,19 @@ tbody tr:last-child td {
 .log-level-success, .log-level-ok { background: color-mix(in oklch, var(--success) 26%, var(--surface)); color: var(--ink); border-color: color-mix(in oklch, var(--success) 60%, transparent); }
 .log-level-warn { background: color-mix(in oklch, var(--warning) 26%, var(--surface)); color: var(--ink); border-color: color-mix(in oklch, var(--warning) 60%, transparent); }
 .log-level-error, .log-level-abort { background: color-mix(in oklch, var(--danger) 22%, var(--surface)); color: var(--danger); border-color: color-mix(in oklch, var(--danger) 60%, transparent); }
+/* 浅色主题（matcha/nordic/neumorph）：log-level-error 用 danger 22% 混 surface
+   在浅米黄/灰底上仍会透出 danger 残色，造成"红/粉字"。改用 ink 中性色保持
+   "错误"语义但不染色。*/
+:root[data-theme="matcha"] .log-level-error,
+:root[data-theme="matcha"] .log-level-abort,
+:root[data-theme="nordic"] .log-level-error,
+:root[data-theme="nordic"] .log-level-abort,
+:root[data-theme="neumorph"] .log-level-error,
+:root[data-theme="neumorph"] .log-level-abort {
+  background: color-mix(in oklch, var(--ink) 14%, var(--surface));
+  color: var(--ink);
+  border-color: color-mix(in oklch, var(--ink) 36%, var(--line));
+}
 
 :root[data-theme="cyber"] .log-level {
   border-radius: 4px;
@@ -4393,7 +4494,7 @@ tbody tr:last-child td {
 }
 .welcome-card {
   position: relative;
-  max-width: 640px;
+  max-width: 720px;
   width: calc(100vw - 48px);
   max-height: calc(100vh - 48px);
   overflow: auto;
@@ -4401,7 +4502,7 @@ tbody tr:last-child td {
   color: var(--ink, #1f2933);
   border-radius: 16px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.32), 0 0 0 1px color-mix(in srgb, var(--primary, #5b8def) 16%, transparent);
-  padding: 32px 36px 28px;
+  padding: 28px 32px 24px;
   animation: welcome-card-in 320ms cubic-bezier(0.2, 0.9, 0.3, 1.1);
 }
 @keyframes welcome-card-in {
@@ -4493,6 +4594,147 @@ tbody tr:last-child td {
   font-size: 13px;
   font-weight: 600;
 }
+
+/* 通用 section 标题：协议清单 / 4 个 Tab / 常用操作 */
+.welcome-protocols,
+.welcome-panels,
+.welcome-actions {
+  margin: 0 0 18px;
+}
+.welcome-protocols h3,
+.welcome-panels h3,
+.welcome-actions h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.welcome-section-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--ink, #1f2933) 55%, transparent);
+  line-height: 1.5;
+}
+
+/* 协议清单：每个 layer 一组，<details> 折叠 */
+.welcome-protocol-group {
+  margin-bottom: 8px;
+  border: 1px solid color-mix(in srgb, var(--ink, #1f2933) 10%, transparent);
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface, #fafafa) 50%, transparent);
+}
+.welcome-protocol-group summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 120ms;
+}
+.welcome-protocol-group summary::-webkit-details-marker { display: none; }
+.welcome-protocol-group summary:hover {
+  background: color-mix(in srgb, var(--primary, #5b8def) 6%, transparent);
+}
+.welcome-protocol-layer {
+  flex: 1;
+  color: var(--ink, #1f2933);
+}
+.welcome-protocol-count {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--primary, #5b8def) 14%, transparent);
+  color: var(--primary, #5b8def);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+}
+.welcome-protocol-group[open] summary {
+  border-bottom: 1px solid color-mix(in srgb, var(--ink, #1f2933) 8%, transparent);
+  background: color-mix(in srgb, var(--primary, #5b8def) 6%, transparent);
+}
+.welcome-protocol-subgroup {
+  padding: 6px 12px 8px;
+}
+.welcome-protocol-subgroup + .welcome-protocol-subgroup {
+  border-top: 1px dashed color-mix(in srgb, var(--ink, #1f2933) 10%, transparent);
+}
+.welcome-protocol-subhead {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--primary, #5b8def) 90%, transparent);
+  padding: 6px 0 4px;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+}
+.welcome-protocol-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+}
+.welcome-protocol-group li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.welcome-protocol-group li strong {
+  flex: 0 0 auto;
+  min-width: 120px;
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  color: var(--primary, #5b8def);
+  font-size: 11px;
+}
+.welcome-protocol-group li span {
+  flex: 1;
+  color: color-mix(in srgb, var(--ink, #1f2933) 75%, transparent);
+}
+
+/* 4 个 Tab 介绍 */
+.welcome-panel-list,
+.welcome-action-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.welcome-panel-list li,
+.welcome-action-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--primary, #5b8def) 4%, transparent);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.welcome-panel-list li strong,
+.welcome-action-list li strong {
+  flex: 0 0 auto;
+  min-width: 88px;
+  color: var(--primary, #5b8def);
+}
+.welcome-panel-list li span,
+.welcome-action-list li span {
+  color: color-mix(in srgb, var(--ink, #1f2933) 75%, transparent);
+}
 .welcome-tip-list {
   list-style: none;
   margin: 0;
@@ -4518,94 +4760,16 @@ tbody tr:last-child td {
   letter-spacing: 0.4px;
   font-family: ui-monospace, "JetBrains Mono", monospace;
 }
-.welcome-tag.tag-file { background: color-mix(in srgb, #3b82f6 18%, transparent); color: #1e40af; }
-.welcome-tag.tag-tx   { background: color-mix(in srgb, #8b5cf6 18%, transparent); color: #6d28d9; }
-.welcome-tag.tag-msg  { background: color-mix(in srgb, #f59e0b 18%, transparent); color: #b45309; }
+.welcome-tag.tag-file { background: color-mix(in oklch, var(--primary) 18%, transparent); color: var(--primary-strong, var(--ink)); }
+.welcome-tag.tag-tx   { background: color-mix(in oklch, #8b5cf6 18%, transparent); color: #6d28d9; }
+.welcome-tag.tag-msg  { background: color-mix(in oklch, var(--warning) 22%, transparent); color: color-mix(in oklch, var(--warning) 50%, var(--ink)); }
 .welcome-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
-  padding-top: 8px;
+  padding-top: 12px;
   border-top: 1px solid color-mix(in srgb, var(--ink, #1f2933) 8%, transparent);
-}
-.welcome-dismiss {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex: 1;
-  cursor: pointer;
-  user-select: none;
-  /* 用 padding 而不是直接 margin，避免 hover 高亮区被切掉 */
-  padding: 4px 6px;
-  border-radius: 8px;
-  transition: background 120ms;
-}
-.welcome-dismiss:hover {
-  background: color-mix(in srgb, var(--primary, #5b8def) 6%, transparent);
-}
-.welcome-dismiss-label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-.welcome-dismiss-label strong {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink, #1f2933);
-}
-.welcome-dismiss-hint {
-  font-size: 11px;
-  line-height: 1.4;
-  color: color-mix(in srgb, var(--ink, #1f2933) 55%, transparent);
-}
-/* iOS 风格 toggle 开关 */
-.welcome-toggle {
-  position: relative;
-  display: inline-block;
-  flex: 0 0 auto;
-  width: 40px;
-  height: 22px;
-}
-.welcome-toggle input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 1;
-}
-.welcome-toggle-track {
-  position: absolute;
-  inset: 0;
-  background: color-mix(in srgb, var(--ink, #1f2933) 18%, transparent);
-  border-radius: 999px;
-  transition: background 180ms ease;
-}
-.welcome-toggle-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 18px;
-  height: 18px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  transition: transform 180ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
-}
-.welcome-toggle input:checked ~ .welcome-toggle-track {
-  background: var(--primary, #5b8def);
-}
-.welcome-toggle input:checked ~ .welcome-toggle-track .welcome-toggle-thumb {
-  transform: translateX(18px);
-}
-.welcome-toggle input:focus-visible ~ .welcome-toggle-track {
-  outline: 2px solid color-mix(in srgb, var(--primary, #5b8def) 50%, transparent);
-  outline-offset: 2px;
 }
 /* 移动端响应式 */
 @media (max-width: 600px) {
@@ -4709,19 +4873,6 @@ tbody tr:last-child td {
   color: color-mix(in srgb, var(--ink, #1f2933) 55%, transparent);
   text-align: right;
 }
-.quickstart-close {
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--ink, #1f2933);
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 120ms;
-}
-.quickstart-close:hover { background: color-mix(in srgb, var(--ink, #1f2933) 10%, transparent); }
 .quickstart-steps {
   list-style: none;
   margin: 0;

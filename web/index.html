@@ -283,7 +283,6 @@
               <span class="quickstart-badge" aria-hidden="true">3</span>
               <span class="quickstart-title" data-i18n="quickstartTitle">3 步快速开始</span>
               <span class="quickstart-toggle-hint" data-i18n="quickstartToggleHint">点击展开 / 收起</span>
-              <button type="button" class="quickstart-close" id="quickstart-close" aria-label="关闭">✕</button>
             </summary>
             <ol class="quickstart-steps">
               <li><strong data-i18n="quickstartStep1Label">选协议</strong><span data-i18n="quickstartStep1Body">左侧「协议与场景」下拉框选协议与场景</span></li>
@@ -662,19 +661,74 @@
           </ul>
         </section>
 
+        <section class="welcome-protocols">
+          <h3 data-i18n="welcomeProtocolsTitle">13 个协议清单</h3>
+          <p class="welcome-section-hint" data-i18n="welcomeProtocolsHint">按 OSI 层 / 教学主题分组，每个协议都配了 2-4 个场景（正常 + 攻击）</p>
+          <details class="welcome-protocol-group" open>
+            <summary>
+              <span class="welcome-protocol-layer" data-i18n="welcomeProtocolsAll">13 个协议</span>
+              <span class="welcome-protocol-count">13</span>
+            </summary>
+            <div class="welcome-protocol-subgroup">
+              <div class="welcome-protocol-subhead" data-i18n="welcomeLayerL4">L4 传输（7 个）</div>
+              <ul>
+                <li><strong>udp-basic</strong><span data-i18n="protoUdpBasic">JOIN→PASS→DATA→TERMINATE 三次密码 + SHA1 摘要</span></li>
+                <li><strong>udp-reliable</strong><span data-i18n="protoUdpReliable">ACK/NACK、超时重传、滑动窗口、丢包乱序重复模拟</span></li>
+                <li><strong>tcp-basic</strong><span data-i18n="protoTcpBasic">半包粘包、connection-close 中途断连</span></li>
+                <li><strong>tls-like</strong><span data-i18n="protoTlsLike">ClientHello/ServerHello/Finished + HMAC-SHA1 + 篡改检测</span></li>
+                <li><strong>http-basic</strong><span data-i18n="protoHttpBasic">request/response 事务视图 + 状态码 403/405/413</span></li>
+                <li><strong>websocket-basic</strong><span data-i18n="protoWebsocketBasic">Upgrade 握手 + TEXT/PING/PONG + Close 帧</span></li>
+                <li><strong>quic-like</strong><span data-i18n="protoQuicLike">多 stream + ACK + 0-RTT 重放风险</span></li>
+              </ul>
+            </div>
+            <div class="welcome-protocol-subgroup">
+              <div class="welcome-protocol-subhead" data-i18n="welcomeLayerL7">L7 应用 Phase 2（6 个）</div>
+              <ul>
+                <li><strong>dns</strong><span data-i18n="protoDns">缓存投毒 / 应答伪造 / DoH 降级告警</span></li>
+                <li><strong>oauth2</strong><span data-i18n="protoOauth2">授权码流 / PKCE 挑战 / Token 重放</span></li>
+                <li><strong>mqtt</strong><span data-i18n="protoMqtt">pub/sub + QoS 0/1/2 + ACL + 明文嗅探</span></li>
+                <li><strong>http2</strong><span data-i18n="protoHttp2">二进制分帧 + 多路复用 + HPACK 错误</span></li>
+                <li><strong>sip</strong><span data-i18n="protoSip">INVITE/REGISTER + SIPS 降级 + 重放</span></li>
+                <li><strong>radius</strong><span data-i18n="protoRadius">AAA + 共享密钥 HMAC + PAP/CHAP + 重放</span></li>
+              </ul>
+            </div>
+          </details>
+        </section>
+
+        <section class="welcome-panels">
+          <h3 data-i18n="welcomePanelsTitle">4 个 Tab 各看什么</h3>
+          <ul class="welcome-panel-list">
+            <li>
+              <strong data-i18n="tabDashboard">仪表盘</strong>
+              <span data-i18n="welcomePanelDashboard">服务/客户端状态、阶段进度条、协议摘要对比、吞吐率 sparkline、最近日志</span>
+            </li>
+            <li>
+              <strong data-i18n="tabProtocol">协议</strong>
+              <span data-i18n="welcomePanelProtocol">双向时序图（client/server 两条泳道）、包列表、Packet Inspector（看 type/wire_hex/sha1 等）</span>
+            </li>
+            <li>
+              <strong data-i18n="tabTransfer">传输</strong>
+              <span data-i18n="welcomePanelTransfer">Hero 摘要 + 阶段条 + 进度条 + 分片矩阵（丢/重/乱/时间带 toggle） + 完整性面板</span>
+            </li>
+            <li>
+              <strong data-i18n="tabLogs">日志与测试</strong>
+              <span data-i18n="welcomePanelLogs">实时日志（按角色/级别/事件/时间过滤）+ 51 个自动化测试用例</span>
+            </li>
+          </ul>
+        </section>
+
+        <section class="welcome-actions">
+          <h3 data-i18n="welcomeActionsTitle">侧栏常用操作</h3>
+          <ul class="welcome-action-list">
+            <li><strong data-i18n="startServer">启动服务端</strong><span data-i18n="welcomeActionStartServer">先开 server 等客户端连入</span></li>
+            <li><strong data-i18n="clientStart">启动客户端</strong><span data-i18n="welcomeActionStartClient">触发协议完整流程</span></li>
+            <li><strong data-i18n="stopServer">停止服务端</strong><span data-i18n="welcomeActionStopServer">SIGTERM 给 2s 缓冲，server 写完最终日志再退出</span></li>
+            <li><strong data-i18n="resetRun">重置实验</strong><span data-i18n="welcomeActionResetRun">清空所有日志、停止进程、回到 INIT 状态</span></li>
+            <li><strong data-i18n="runTests">运行测试</strong><span data-i18n="welcomeActionRunTests">执行 51 个场景化测试，验证所有协议功能</span></li>
+          </ul>
+        </section>
+
         <footer class="welcome-footer">
-          <label class="welcome-dismiss" for="welcome-no-show">
-            <span class="welcome-dismiss-label">
-              <strong data-i18n="welcomeDismissTitle">记住我的选择</strong>
-              <span class="welcome-dismiss-hint" data-i18n="welcomeDismissHint">关闭后下次启动不再弹出，可随时从侧栏底部「查看入门指南」重新打开</span>
-            </span>
-            <span class="welcome-toggle">
-              <input type="checkbox" id="welcome-no-show" />
-              <span class="welcome-toggle-track" aria-hidden="true">
-                <span class="welcome-toggle-thumb"></span>
-              </span>
-            </span>
-          </label>
           <button type="button" class="primary-button" id="welcome-got-it" data-i18n="welcomeGotIt">开始使用</button>
         </footer>
       </div>

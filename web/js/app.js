@@ -104,6 +104,7 @@ const i18n = {
     inputFilePath: "输入文件路径",
     outputFilePath: "输出文件路径",
     startServer: "启动服务端",
+    clientStart: "启动客户端",
     stopServer: "停止服务端",
     passwordModeHint: "兼容三密码或交互式输入",
     serverHost: "服务端地址",
@@ -405,10 +406,37 @@ const i18n = {
     welcomeTagMsg: "message",
     welcomeTipMsg: "消息视图(WebSocket / MQTT):看 TEXT / PUBLISH 消息计数。",
     welcomeNoShow: "不再显示",
-    welcomeDismissTitle: "记住我的选择",
-    welcomeDismissHint: "关闭后下次启动不再弹出；可随时从侧栏底部「查看入门指南」重新打开",
     welcomeGotIt: "开始使用",
     welcomeReopen: "查看入门指南",
+    welcomeProtocolsTitle: "13 个协议清单",
+    welcomeProtocolsHint: "按 OSI 层 / 教学主题分组，每个协议都配了 2-4 个场景（正常 + 攻击）",
+    welcomeProtocolsAll: "13 个协议",
+    welcomeLayerL4: "L4 传输（7 个）",
+    welcomeLayerL7: "L7 应用（6 个）",
+    protoUdpBasic: "JOIN→PASS→DATA→TERMINATE 三次密码 + SHA1 摘要",
+    protoUdpReliable: "ACK/NACK、超时重传、滑动窗口、丢包乱序重复模拟",
+    protoTcpBasic: "半包粘包、connection-close 中途断连",
+    protoTlsLike: "ClientHello/ServerHello/Finished + HMAC-SHA1 + 篡改检测",
+    protoHttpBasic: "request/response 事务视图 + 状态码 403/405/413",
+    protoWebsocketBasic: "Upgrade 握手 + TEXT/PING/PONG + Close 帧",
+    protoQuicLike: "多 stream + ACK + 0-RTT 重放风险",
+    protoDns: "缓存投毒 / 应答伪造 / DoH 降级告警",
+    protoOauth2: "授权码流 / PKCE 挑战 / Token 重放",
+    protoMqtt: "pub/sub + QoS 0/1/2 + ACL + 明文嗅探",
+    protoHttp2: "二进制分帧 + 多路复用 + HPACK 错误",
+    protoSip: "INVITE/REGISTER + SIPS 降级 + 重放",
+    protoRadius: "AAA + 共享密钥 HMAC + PAP/CHAP + 重放",
+    welcomePanelsTitle: "4 个 Tab 各看什么",
+    welcomePanelDashboard: "服务/客户端状态、阶段进度条、协议摘要对比、吞吐率 sparkline、最近日志",
+    welcomePanelProtocol: "双向时序图（client/server 两条泳道）、包列表、Packet Inspector（看 type/wire_hex/sha1 等）",
+    welcomePanelTransfer: "Hero 摘要 + 阶段条 + 进度条 + 分片矩阵（丢/重/乱/时间带 toggle） + 完整性面板",
+    welcomePanelLogs: "实时日志（按角色/级别/事件/时间过滤）+ 51 个自动化测试用例",
+    welcomeActionsTitle: "侧栏常用操作",
+    welcomeActionStartServer: "先开 server 等客户端连入",
+    welcomeActionStartClient: "触发协议完整流程",
+    welcomeActionStopServer: "SIGTERM 给 2s 缓冲，server 写完最终日志再退出",
+    welcomeActionResetRun: "清空所有日志、停止进程、回到 INIT 状态",
+    welcomeActionRunTests: "执行 51 个场景化测试，验证所有协议功能",
     quickstartTitle: "3 步快速开始",
     quickstartToggleHint: "点击展开 / 收起",
     quickstartStep1Label: "选协议",
@@ -429,6 +457,7 @@ const i18n = {
     inputFilePath: "Input file path",
     outputFilePath: "Output file path",
     startServer: "Start server",
+    clientStart: "Start client",
     stopServer: "Stop server",
     passwordModeHint: "Three-password compatibility or interactive input",
     serverHost: "Server host",
@@ -730,10 +759,37 @@ const i18n = {
     welcomeTagMsg: "message",
     welcomeTipMsg: "Message view (WebSocket / MQTT): TEXT / PUBLISH message counts.",
     welcomeNoShow: "Don't show again",
-    welcomeDismissTitle: "Remember my choice",
-    welcomeDismissHint: "Skip this on next start; you can always reopen from \"Show guide\" at the bottom of the sidebar.",
     welcomeGotIt: "Got it",
     welcomeReopen: "Show getting-started guide",
+    welcomeProtocolsTitle: "13 protocols at a glance",
+    welcomeProtocolsHint: "Grouped by OSI layer / teaching topic. Each protocol ships with 2-4 scenarios (normal + attack).",
+    welcomeProtocolsAll: "13 protocols",
+    welcomeLayerL4: "L4 transport (7)",
+    welcomeLayerL7: "L7 application (6)",
+    protoUdpBasic: "JOIN→PASS→DATA→TERMINATE three-password auth + SHA1 digest",
+    protoUdpReliable: "ACK/NACK, retransmit, sliding window, loss/reorder/duplicate simulation",
+    protoTcpBasic: "Half-packet / sticky-packet framing, mid-transfer connection close",
+    protoTlsLike: "ClientHello/ServerHello/Finished + HMAC-SHA1 + tamper detection",
+    protoHttpBasic: "Request/response transaction view with status codes 403/405/413",
+    protoWebsocketBasic: "Upgrade handshake + TEXT/PING/PONG + Close frames",
+    protoQuicLike: "Multi-stream + ACK + 0-RTT replay risk",
+    protoDns: "Cache poisoning / response spoofing / DoH downgrade alert",
+    protoOauth2: "Authorization code flow / PKCE challenge / token replay",
+    protoMqtt: "pub/sub + QoS 0/1/2 + ACL + cleartext sniffing",
+    protoHttp2: "Binary framing + multiplexing + HPACK errors",
+    protoSip: "INVITE/REGISTER + SIPS downgrade + replay",
+    protoRadius: "AAA + shared-secret HMAC + PAP/CHAP + replay",
+    welcomePanelsTitle: "What each tab shows",
+    welcomePanelDashboard: "Server/client status, phase progress, protocol summary + compare, throughput sparkline, recent logs",
+    welcomePanelProtocol: "Two-lane sequence diagram (client/server), packet list, Packet Inspector (type / wire_hex / sha1)",
+    welcomePanelTransfer: "Hero summary + phase rail + progress bar + fragment matrix (loss/dup/oof/time-band toggles) + integrity panel",
+    welcomePanelLogs: "Live logs (filter by role / level / event / time) + 51 automated test cases",
+    welcomeActionsTitle: "Sidebar actions",
+    welcomeActionStartServer: "Start server first, wait for client to connect",
+    welcomeActionStartClient: "Trigger the full protocol flow",
+    welcomeActionStopServer: "SIGTERM with 2s grace so the server can flush final logs",
+    welcomeActionResetRun: "Clear all logs, stop processes, return to INIT",
+    welcomeActionRunTests: "Run 51 scenario-based tests to verify all protocol features",
     quickstartTitle: "3-step quick start",
     quickstartToggleHint: "Click to expand / collapse",
     quickstartStep1Label: "Pick protocol",
@@ -2120,60 +2176,37 @@ function renderDashboard(run) {
   renderLogList(byId("recent-logs"), flowLogs.slice(-8), true);
 }
 
-/* initWelcomeOverlay: 首次访问显示欢迎面板；localStorage 标记控制再显示。
-   - 默认情况下（localStorage 没有 dismissed 标记），首次刷新日志后展示
-   - 用户点 ✕ / "开始使用" / 勾选"不再显示"都会写入 localStorage
-   - 任何关闭方式都同步刷新 i18n 标签（语言切换后再次打开能正确显示）*/
-const WELCOME_DISMISS_KEY = "udpLabWelcomeDismissed";
+/* initWelcomeOverlay: 首次访问显示欢迎面板；首次显示后写入 "已看过" 标记，
+   后续不再自动弹出，但用户可随时通过顶栏 "?" 按钮重新打开。
+   - localStorage 标记：udpLabWelcomeSeen
+   - 不再有 "不再显示" toggle；首次展示即视为已"看过" */
+const WELCOME_SEEN_KEY = "udpLabWelcomeSeen";
 function initWelcomeOverlay() {
   const overlay = byId("welcome-overlay");
   if (!overlay) return;
-  const dismissCheckbox = byId("welcome-no-show");
   const closeBtn = byId("welcome-close");
   const gotItBtn = byId("welcome-got-it");
-  let dismissed = false;
+  let seen = false;
   try {
-    dismissed = localStorage.getItem(WELCOME_DISMISS_KEY) === "1";
+    seen = localStorage.getItem(WELCOME_SEEN_KEY) === "1";
   } catch (error) {
     console.warn(error);
   }
-  /* 关闭逻辑：写入 localStorage（如勾选"不再显示"），隐藏 overlay */
+  /* 关闭逻辑：写入"已看过"标记，隐藏 overlay */
   const hideOverlay = () => {
     overlay.hidden = true;
-    try {
-      if (dismissCheckbox && dismissCheckbox.checked) {
-        localStorage.setItem(WELCOME_DISMISS_KEY, "1");
-      }
-    } catch (error) {
-      console.warn(error);
-    }
+    try { localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch (error) { /* ignore */ }
   };
   if (closeBtn) closeBtn.addEventListener("click", hideOverlay);
   if (gotItBtn) gotItBtn.addEventListener("click", hideOverlay);
-  /* 顶栏 "?" 按钮：随时调出完整欢迎面板（不写入 dismissed 标记） */
+  /* 顶栏 "?" 按钮：随时调出完整欢迎面板（不修改"已看过"标记） */
   const reopenFn = () => {
     overlay.hidden = false;
-    if (dismissCheckbox) dismissCheckbox.checked = false;
     /* 让 data-i18n 文案按当前语言刷新 */
     applyLanguage();
   };
   const topbarHelpBtn = byId("topbar-help-btn");
   if (topbarHelpBtn) topbarHelpBtn.addEventListener("click", reopenFn);
-  /* dashboard quickstart banner：✕ 永久收起（记住状态），summary 仍可临时展开 */
-  const quickstartClose = byId("quickstart-close");
-  const quickstartBanner = byId("quickstart-banner");
-  if (quickstartClose && quickstartBanner) {
-    let qsDismissed = false;
-    try { qsDismissed = localStorage.getItem("udpLabQuickstartDismissed") === "1"; } catch (e) { /* ignore */ }
-    if (qsDismissed) quickstartBanner.open = false;
-    quickstartClose.addEventListener("click", (event) => {
-      /* 阻止冒泡到 summary（否则 summary 会切换 open 状态） */
-      event.preventDefault();
-      event.stopPropagation();
-      quickstartBanner.open = false;
-      try { localStorage.setItem("udpLabQuickstartDismissed", "1"); } catch (e) { /* ignore */ }
-    });
-  }
   /* 点遮罩空白处也关闭（但不勾选"不再显示"） */
   overlay.addEventListener("click", (event) => {
     if (event.target === overlay) hideOverlay();
@@ -2182,14 +2215,13 @@ function initWelcomeOverlay() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !overlay.hidden) hideOverlay();
   });
-  /* 仅在用户没有勾选过"不再显示"时展示 */
-  if (!dismissed) {
+  /* 仅在用户没有"看过"时展示 */
+  if (!seen) {
     overlay.hidden = false;
   }
   /* 暴露一个全局打开函数：用户在 ?help=1 或顶栏"帮助"按钮可主动调 */
   window.openWelcomeOverlay = () => {
     overlay.hidden = false;
-    if (dismissCheckbox) dismissCheckbox.checked = false;
     applyLanguage();
   };
   /* 语言切换时也同步刷新 welcome 里的 data-i18n 文案（render 整体刷新）*/
