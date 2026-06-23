@@ -38,6 +38,9 @@ const appState = {
     flow: "",
     state: "",
     sort: "newest",
+    /* 全文搜索关键词（被 web/js/search.js 写入），与 type/direction/flow/state 并列过滤。
+       命中字段：packet_type / direction / flow_id / state / uid / hex preview。 */
+    search: "",
   },
   logFilters: {
     role: "",
@@ -56,6 +59,9 @@ const appState = {
     timeTo: "",
     sort: "newest",
     errorOnly: false,
+    /* 全文搜索关键词（被 web/js/search.js 写入），与 role/level/event 并列过滤。
+       命中字段：time / role / level / event / state / packet_type / message。 */
+    search: "",
   },
   pagination: {
     packets: 1,
@@ -2621,12 +2627,21 @@ function filteredPackets() {
   const direction = appState.packetFilters.direction;
   const flow = appState.packetFilters.flow;
   const state = appState.packetFilters.state;
+  /* 全文搜索：与 select 过滤器并列（AND）。空串跳过。 */
+  const search = (appState.packetFilters.search || "").trim().toLowerCase();
   return source.filter((entry) => {
     const rawDirection = packetDirection(entry);
     if (type && entry.packet_type !== type) return false;
     if (direction && rawDirection !== direction) return false;
     if (flow && entry.flow_id !== flow) return false;
     if (state && entry.state !== state) return false;
+    if (search) {
+      const haystack = [
+        entry.packet_type, rawDirection, entry.flow_id, entry.state,
+        entry.uid, entry.hex_preview, entry.message,
+      ].filter(Boolean).join(" ").toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
     return true;
   });
 }
@@ -3451,6 +3466,15 @@ function filteredLogs() {
       const t = logTimeMs(entry);
       if (fromMs !== null && t < fromMs) return false;
       if (toMs !== null && t > toMs) return false;
+    }
+    /* 全文搜索：与 select 过滤器并列（AND），不破坏原有过滤逻辑。空串跳过。 */
+    const search = (appState.logFilters.search || "").trim().toLowerCase();
+    if (search) {
+      const haystack = [
+        entry.time, entry.role, entry.level, entry.event,
+        entry.state, entry.packet_type, entry.message, entry.flow_id,
+      ].filter(Boolean).join(" ").toLowerCase();
+      if (!haystack.includes(search)) return false;
     }
     return true;
   });
@@ -4323,6 +4347,28 @@ async function boot() {
     sampleThroughput();
     renderThroughput(deriveRun());
   }, 1000);
+  /* 通知 feature 模块：app 已就绪，state/dom/事件 全部可用 */
+  window.Lab = {
+    state: appState,
+    api: window.Api,
+    theme: window.ThemeManager,
+    i18n: i18n,
+    helpers: {
+      formatBytes: formatBytes,
+      protocolDisplayName: protocolDisplayName,
+      byId: byId,
+      t: t,
+      escapeHtml: escapeHtml,
+    },
+    /* feature 模块可调 render() 触发重渲染。 */
+    render: () => { try { render(); } catch (e) { console.warn("Lab.render failed", e); } },
+    renderProtocol: () => { try { renderProtocol(); } catch (e) { console.warn("Lab.renderProtocol failed", e); } },
+    /* 命令面板用：执行一条"命令"。feature 模块不直接调内部函数，
+       而是注册到 Lab.commands 后由 palette 调 execute。 */
+    commands: {},
+    ready: true,
+  };
+  document.dispatchEvent(new CustomEvent("lab:ready"));
 }
 
 boot();

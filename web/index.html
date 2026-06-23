@@ -246,24 +246,29 @@
 
       <div class="workbench">
         <header class="topbar">
-          <div>
-            <p class="caption" data-i18n="appName">UDP 安全传输实验台</p>
-            <h1 data-i18n="topTitle">最小安全通信协议控制台</h1>
+          <div class="topbar-row">
+            <div class="topbar-title">
+              <p class="caption" data-i18n="appName">UDP 安全传输实验台</p>
+              <h1 data-i18n="topTitle">最小安全通信协议控制台</h1>
+            </div>
+            <div class="status-strip" aria-live="polite">
+              <span class="status-pill" id="server-pill">服务端：已停止</span>
+              <span class="status-pill" id="client-pill">客户端：已停止</span>
+              <span class="status-pill" id="phase-pill">阶段：INIT</span>
+              <span class="status-pill result" id="result-pill">结果：等待</span>
+            </div>
+            <div class="topbar-actions">
+              <button type="button" class="help-button" id="topbar-help-btn"
+                      aria-label="使用入门" data-i18n-aria-label="welcomeReopen"
+                      data-i18n-title="welcomeReopen"
+                      title="使用入门">
+                <span class="help-icon" aria-hidden="true">?</span>
+                <span class="help-label" data-i18n="welcomeReopen">入门</span>
+              </button>
+            </div>
           </div>
-          <div class="status-strip" aria-live="polite">
-            <span class="status-pill" id="server-pill">服务端：已停止</span>
-            <span class="status-pill" id="client-pill">客户端：已停止</span>
-            <span class="status-pill" id="phase-pill">阶段：INIT</span>
-            <span class="status-pill result" id="result-pill">结果：等待</span>
-          </div>
-          <div class="topbar-actions">
-            <button type="button" class="help-button" id="topbar-help-btn"
-                    aria-label="使用入门" data-i18n-aria-label="welcomeReopen"
-                    data-i18n-title="welcomeReopen"
-                    title="使用入门">
-              <span class="help-icon" aria-hidden="true">?</span>
-              <span class="help-label" data-i18n="welcomeReopen">入门</span>
-            </button>
+          <div class="topbar-info-strip" id="topbar-info-strip" aria-live="polite">
+            <!-- 由 web/js/dock.js 注入：协议 / PID / 运行时长 / 吞吐 / Flow / 状态 -->
           </div>
         </header>
 
@@ -350,7 +355,7 @@
                   <span class="hint" id="packet-count">0 个包</span>
                 </div>
               </div>
-              <div class="control-bar packet-control-bar">
+              <div class="control-bar packet-control-bar" id="packet-filters" data-role="packet-filters">
                 <div class="control-bar-section">
                   <select id="packet-type-filter" class="filter-select" aria-label="包类型">
                     <option value="" data-i18n="allPacketTypes">类型</option>
@@ -518,7 +523,7 @@
                 <h2 data-i18n="logFilters">日志过滤</h2>
                 <span class="hint" data-i18n="logFormatHint">JSON 行日志</span>
               </div>
-              <div class="control-bar log-control-bar">
+              <div class="control-bar log-control-bar" id="log-filters" data-role="log-filters">
                 <div class="control-bar-section">
                   <select id="role-filter" class="filter-select" aria-label="角色">
                     <option value="" data-i18n="allRoles">角色</option>
@@ -737,5 +742,11 @@
     <script src="/js/api.js"></script>
     <script src="/js/theme-manager.js"></script>
     <script src="/js/app.js"></script>
+    <script src="/js/dock.js"></script>
+    <script src="/js/dragdrop.js"></script>
+    <script src="/js/search.js"></script>
+    <script src="/js/notifications.js"></script>
+    <script src="/js/sequence-export.js"></script>
+    <script src="/js/command-palette.js"></script>
   </body>
 </html>
